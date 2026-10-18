@@ -33,6 +33,7 @@ import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.serialization.Serializable
+import me.zhanghai.compose.preference.Preference
 import me.zhanghai.compose.preference.ProvidePreferenceLocals
 import me.zhanghai.compose.preference.SliderPreference
 import me.zhanghai.compose.preference.SwitchPreference
@@ -118,6 +119,19 @@ object AppearancePreferencesScreen : Screen {
                                 isDarkMode = isDarkMode,
                                 onThemeSelected = { preferences.appTheme.set(it) },
                                 modifier = Modifier.padding(vertical = 8.dp),
+                            )
+
+                            PreferenceDivider()
+
+                            Preference(
+                                title = { Text(text = "Customize theme") },
+                                summary = {
+                                    Text(
+                                        text = "Background picture or color, accent color, transparency and blur",
+                                        color = MaterialTheme.colorScheme.outline,
+                                    )
+                                },
+                                onClick = { backstack.add(CustomizeThemeScreen) },
                             )
 
                             PreferenceDivider()
@@ -257,6 +271,25 @@ object AppearancePreferencesScreen : Screen {
                                 summary = {
                                     Text(
                                         text = stringResource(id = R.string.pref_gesture_tap_thumbnail_to_select_summary),
+                                        color = MaterialTheme.colorScheme.outline,
+                                    )
+                                }
+                            )
+
+                            PreferenceDivider()
+
+                            val showNetworkThumbnails by preferences.showNetworkThumbnails.collectAsState()
+                            SwitchPreference(
+                                value = showNetworkThumbnails,
+                                onValueChange = { preferences.showNetworkThumbnails.set(it) },
+                                title = {
+                                    Text(
+                                        text = stringResource(id = R.string.pref_appearance_show_network_thumbnails_title),
+                                    )
+                                },
+                                summary = {
+                                    Text(
+                                        text = stringResource(id = R.string.pref_appearance_show_network_thumbnails_summary),
                                         color = MaterialTheme.colorScheme.outline,
                                     )
                                 }

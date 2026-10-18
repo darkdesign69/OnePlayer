@@ -162,6 +162,7 @@ fun PlayerControls(
   val audioPreferences = koinInject<AudioPreferences>()
   val showSystemStatusBar by playerPreferences.showSystemStatusBar.collectAsState()
   val showSystemNavigationBar by playerPreferences.showSystemNavigationBar.collectAsState()
+  val mxLayout by playerPreferences.mxPlayerLayout.collectAsState()
   val interactionSource = remember { MutableInteractionSource() }
   val controlsShown by viewModel.controlsShown.collectAsState()
   val areControlsLocked by viewModel.areControlsLocked.collectAsState()
@@ -278,6 +279,7 @@ fun PlayerControls(
       val isPortrait by remember(configuration) {
         derivedStateOf { configuration.orientation == ORIENTATION_PORTRAIT }
       }
+      val mxPortrait = mxLayout && isPortrait
 
       ConstraintLayout(
         modifier =
@@ -290,7 +292,7 @@ fun PlayerControls(
                 Pair(.6f, Color.Transparent),
                 Pair(1f, Color.Black),
               ),
-              alpha = transparentOverlay,
+              alpha = if (mxPortrait) 0f else transparentOverlay,
             ),
       ) {
         val (topLeftControls, topRightControls) = createRefs()
@@ -300,6 +302,7 @@ fun PlayerControls(
         val playerPauseButton = createRef()
         val seekbar = createRef()
         val (playerUpdates) = createRefs()
+        val mxControlsRoot = createRef()
 
         val isBrightnessSliderShown by viewModel.isBrightnessSliderShown.collectAsState()
         val isVolumeSliderShown by viewModel.isVolumeSliderShown.collectAsState()
@@ -592,6 +595,44 @@ fun PlayerControls(
         val areButtonsVisible = controlsShown && !areControlsLocked && !areSlidersShown
 
         AnimatedVisibility(
+          visible = mxPortrait && controlsShown && !areControlsLocked,
+          enter = fadeIn(playerControlsEnterAnimationSpec()),
+          exit = fadeOut(playerControlsExitAnimationSpec()),
+          modifier =
+            Modifier.constrainAs(mxControlsRoot) {
+              top.linkTo(parent.top)
+              bottom.linkTo(parent.bottom)
+              start.linkTo(parent.start)
+              end.linkTo(parent.end)
+              width = Dimension.fillToConstraints
+              height = Dimension.fillToConstraints
+            },
+        ) {
+          MxPortraitControls(
+            viewModel = viewModel,
+            activity = activity,
+            mediaTitle = mediaTitle,
+            buttons = portraitBottomButtons,
+            chapters = chapters,
+            currentChapter = currentChapter,
+            isSpeedNonOne = isSpeedNonOne,
+            currentZoom = currentZoom,
+            aspect = aspect,
+            decoder = decoder,
+            playbackSpeed = playbackSpeed ?: 1f,
+            paused = paused ?: false,
+            position = precisePosition,
+            duration = if (preciseDuration > 0) preciseDuration else duration?.toFloat() ?: 0f,
+            loopStart = abLoopA?.toFloat(),
+            loopEnd = abLoopB?.toFloat(),
+            onBackPress = onBackPress,
+            onOpenSheet = onOpenSheet,
+            onOpenPanel = onOpenPanel,
+            onSeekingChanged = { isSeeking = it },
+          )
+        }
+
+        AnimatedVisibility(
           visible = controlsShown && areControlsLocked,
           enter = fadeIn(),
           exit = fadeOut(),
@@ -610,7 +651,7 @@ fun PlayerControls(
         }
 
         AnimatedVisibility(
-          visible = controlsShown && !areControlsLocked,
+          visible = controlsShown && !areControlsLocked && !mxPortrait,
           enter = fadeIn(playerControlsEnterAnimationSpec()),
           exit = fadeOut(playerControlsExitAnimationSpec()),
           modifier =
@@ -851,7 +892,7 @@ fun PlayerControls(
         }
 
         AnimatedVisibility(
-          visible = controlsShown && !areControlsLocked,
+          visible = controlsShown && !areControlsLocked && !mxPortrait,
           enter =
             if (!reduceMotion) {
               slideInVertically(playerControlsEnterAnimationSpec()) { it } +
@@ -932,7 +973,7 @@ fun PlayerControls(
         }
 
         AnimatedVisibility(
-          visible = controlsShown && !areControlsLocked,
+          visible = controlsShown && !areControlsLocked && !mxPortrait,
           enter =
             if (!reduceMotion) {
               slideInHorizontally(playerControlsEnterAnimationSpec()) { -it } +
@@ -1059,7 +1100,7 @@ fun PlayerControls(
         }
 
         AnimatedVisibility(
-          visible = controlsShown && !areControlsLocked && !areSlidersShown,
+          visible = controlsShown && !areControlsLocked && !areSlidersShown && !mxPortrait,
           enter =
             if (!reduceMotion) {
               slideInHorizontally(playerControlsEnterAnimationSpec()) { it } +

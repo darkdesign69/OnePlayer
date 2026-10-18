@@ -92,7 +92,7 @@ class MainActivity : ComponentActivity() {
         autoConnectToNetworks()
       }
 
-      MpvexTheme {
+      MpvexTheme(applyCustomBackground = true) {
         Surface {
           Navigator()
         }

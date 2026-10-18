@@ -27,7 +27,15 @@ class AppearancePreferences(
   val hidePlayerButtonsBackground = preferenceStore.getBoolean("hide_player_buttons_background", false)
   val showUnplayedOldVideoLabel = preferenceStore.getBoolean("show_unplayed_old_video_label", true)
   val unplayedOldVideoDays = preferenceStore.getInt("unplayed_old_video_days", 7)
+  val showNetworkThumbnails = preferenceStore.getBoolean("show_network_thumbnails", false)
   val seekbarStyle = preferenceStore.getEnum("seekbar_style", SeekbarStyle.Thick)
+
+  // Customize Theme: "none", "image" or "preset:<id>"
+  val customBackground = preferenceStore.getString("custom_background", "none")
+  val customBackgroundVersion = preferenceStore.getInt("custom_background_version", 0)
+  val customBackgroundTransparency = preferenceStore.getFloat("custom_background_transparency", 0.5f)
+  val customBackgroundBlur = preferenceStore.getFloat("custom_background_blur", 0f)
+  val customAccent = preferenceStore.getInt("custom_accent", 0)
 
   val topLeftControls =
     preferenceStore.getString(

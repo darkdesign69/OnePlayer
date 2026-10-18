@@ -1,5 +1,5 @@
 <resources>
-  <string name="app_name" translatable="false">mpvEx</string>
+  <string name="app_name" translatable="false">One Player - Video Player</string>
   <string name="generic_reset">Reset</string>
   <string name="generic_share">Share</string>
   <string name="generic_confirm">Confirm</string>
@@ -28,6 +28,8 @@
   <string name="pref_appearance_show_unplayed_old_video_label_summary">Display a \"New\" label on videos added within specified days that have never been played</string>
   <string name="pref_appearance_unplayed_old_video_days_title">Days threshold for new video label</string>
   <string name="pref_appearance_unplayed_old_video_days_summary">Videos added within the last %d days without playback history will be marked as new</string>
+  <string name="pref_appearance_show_network_thumbnails_title">Show network thumbnails (Experimental)</string>
+  <string name="pref_appearance_show_network_thumbnails_summary">Generate thumbnails for network streams (May increase data usage on mobile networks)</string>
   <string name="pref_appearance_theme_picker_label">App Theme</string>
   <string name="pref_appearance_auto_scroll_title">Auto-scroll to last played</string>
   <string name="pref_appearance_auto_scroll_summary">Automatically scroll to the last played video when opening video lists</string>
@@ -138,6 +140,10 @@
   <string name="pref_player_controls_display_volume_as_percentage">Display volume as percentage</string>
   <string name="pref_player_controls_show_loading_circle">Show loading circle</string>
   <string name="pref_player_display_show_status_bar">Show system status bar with controls</string>
+  <string name="pref_player_display_mx_layout">MX Player style layout</string>
+  <string name="pref_player_display_mx_layout_summary">MX Player look for the controls in portrait mode: black top and bottom bars, round shortcut buttons, seek bar with times, lock and play buttons. Landscape keeps the default layout. Takes effect next time you open a video.</string>
+  <string name="pref_player_display_keep_system_bars">Keep system bars visible</string>
+  <string name="pref_player_display_keep_system_bars_summary">Non-fullscreen mode like MX Player. The video plays between the status bar and navigation bar. Takes effect next time you open a video.</string>
   <string name="pref_player_display_panel_opacity">Panel opacity</string>
   <string name="pref_player_display">Display</string>
   <string name="pref_gesture">Gestures</string>

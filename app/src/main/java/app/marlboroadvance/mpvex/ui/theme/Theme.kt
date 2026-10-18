@@ -10,6 +10,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asAndroidPath
@@ -207,7 +209,10 @@ private fun ThemeTransitionContent(content: @Composable () -> Unit) {
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun MpvexTheme(content: @Composable () -> Unit) {
+fun MpvexTheme(
+    applyCustomBackground: Boolean = false,
+    content: @Composable () -> Unit,
+) {
     val preferences = koinInject<AppearancePreferences>()
     val darkMode by preferences.darkMode.collectAsState()
     val amoledMode by preferences.amoledMode.collectAsState()
@@ -221,7 +226,7 @@ fun MpvexTheme(content: @Composable () -> Unit) {
         DarkMode.System -> darkTheme
     }
 
-    val colorScheme = when {
+    val baseColorScheme = when {
         appTheme.isDynamic && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             when {
                 useDarkTheme && amoledMode -> {
@@ -246,6 +251,49 @@ fun MpvexTheme(content: @Composable () -> Unit) {
         else -> appTheme.getLightColorScheme()
     }
 
+    // Customize Theme: accent colour and optional background picture/colour
+    val accentColor by preferences.customAccent.collectAsState()
+    val customBackground by preferences.customBackground.collectAsState()
+    val customBackgroundVersion by preferences.customBackgroundVersion.collectAsState()
+    val customBackgroundTransparency by preferences.customBackgroundTransparency.collectAsState()
+    val customBackgroundBlur by preferences.customBackgroundBlur.collectAsState()
+    val backgroundActive =
+        applyCustomBackground &&
+            remember(customBackground, customBackgroundVersion) {
+                isCustomBackgroundActive(context, customBackground)
+            }
+
+    val accentScheme =
+        if (accentColor != 0) baseColorScheme.withAccent(Color(accentColor)) else baseColorScheme
+    val colorScheme =
+        if (backgroundActive) {
+            accentScheme.withTransparentPanels(customBackgroundTransparency)
+        } else {
+            accentScheme
+        }
+
+    val themedContent: @Composable () -> Unit = {
+        if (backgroundActive) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                CustomBackgroundLayer(
+                    mode = customBackground,
+                    version = customBackgroundVersion,
+                    blur = customBackgroundBlur,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(baseColorScheme.background.copy(alpha = 0.25f)),
+                )
+                content()
+            }
+        } else {
+            content()
+        }
+    }
+
     // Provide theme transition state first, OUTSIDE MaterialTheme
     CompositionLocalProvider(
         LocalSpacing provides Spacing(),
@@ -255,7 +303,7 @@ fun MpvexTheme(content: @Composable () -> Unit) {
             MaterialTheme(
                 colorScheme = colorScheme,
                 typography = AppTypography,
-                content = content,
+                content = themedContent,
                 motionScheme = MotionScheme.expressive(),
             )
         }

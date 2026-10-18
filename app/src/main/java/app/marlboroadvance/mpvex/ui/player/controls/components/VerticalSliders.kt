@@ -1,6 +1,7 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -22,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.BrightnessHigh
 import androidx.compose.material.icons.filled.BrightnessLow
 import androidx.compose.material.icons.filled.BrightnessMedium
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -31,6 +34,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -138,48 +143,76 @@ fun VerticalSlider(
   }
 }
 
+/** Tall white pill with a speaker / sun icon underneath. Transparent: it floats over the video. */
+@Composable
+private fun PillSlider(
+  fraction: Float,
+  icon: ImageVector,
+  label: String,
+  modifier: Modifier = Modifier,
+) {
+  val animatedFraction by animateFloatAsState(
+    targetValue = fraction.coerceIn(0f, 1f),
+    animationSpec = tween(durationMillis = 80),
+    label = "pillsliderfill",
+  )
+  Column(
+    modifier = modifier,
+    horizontalAlignment = Alignment.CenterHorizontally,
+    verticalArrangement = Arrangement.spacedBy(10.dp),
+  ) {
+    Text(
+      text = label,
+      color = Color.White,
+      style = MaterialTheme.typography.labelMedium,
+      textAlign = TextAlign.Center,
+    )
+    Box(
+      modifier =
+        Modifier
+          .width(30.dp)
+          .height(150.dp)
+          .clip(RoundedCornerShape(15.dp))
+          .background(Color.White.copy(alpha = 0.28f)),
+      contentAlignment = Alignment.BottomCenter,
+    ) {
+      Box(
+        modifier =
+          Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(animatedFraction)
+            .clip(RoundedCornerShape(15.dp))
+            .background(Color.White),
+      )
+    }
+    Icon(
+      imageVector = icon,
+      contentDescription = null,
+      tint = Color.White,
+      modifier = Modifier.size(28.dp),
+    )
+  }
+}
+
 @Composable
 fun BrightnessSlider(
   brightness: Float,
   range: ClosedFloatingPointRange<Float>,
   modifier: Modifier = Modifier,
 ) {
-  val coercedBrightness = brightness.coerceIn(range)
-  Surface(
+  val fraction = percentage(brightness.coerceIn(range), range)
+  PillSlider(
+    fraction = fraction,
+    icon = Icons.Filled.WbSunny,
+    label = (fraction * 100).roundToInt().toString(),
     modifier = modifier,
-    shape = RoundedCornerShape(20.dp),
-    color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.55f),
-    contentColor = MaterialTheme.colorScheme.onSurface,
-    tonalElevation = 0.dp,
-    shadowElevation = 0.dp,
-    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-  ) {
-    Column(
-      modifier = Modifier.padding(horizontal = 12.dp, vertical = 16.dp),
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.smaller),
-    ) {
-      Text(
-        (coercedBrightness * 100).toInt().toString(),
-        style = MaterialTheme.typography.bodySmall,
-      )
-      VerticalSlider(
-        coercedBrightness,
-        range,
-      )
-      Icon(
-        when (percentage(coercedBrightness, range)) {
-          in 0f..0.3f -> Icons.Default.BrightnessLow
-          in 0.3f..0.6f -> Icons.Default.BrightnessMedium
-          in 0.6f..1f -> Icons.Default.BrightnessHigh
-          else -> Icons.Default.BrightnessMedium
-        },
-        contentDescription = null,
-      )
-    }
-  }
+  )
 }
 
+/**
+ * Volume on a 0..100 scale: 0..50 is the phone's own volume (0 to its maximum),
+ * 51..100 is the boosted volume above the phone's maximum.
+ */
 @Composable
 fun VolumeSlider(
   volume: Int,
@@ -189,45 +222,24 @@ fun VolumeSlider(
   modifier: Modifier = Modifier,
   displayAsPercentage: Boolean = false,
 ) {
-  val percentage = (percentage(volume, range) * 100).roundToInt()
-  Surface(
-    modifier = modifier,
-    shape = RoundedCornerShape(20.dp),
-    color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.55f),
-    contentColor = MaterialTheme.colorScheme.onSurface,
-    tonalElevation = 0.dp,
-    shadowElevation = 0.dp,
-    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-  ) {
-    Column(
-      modifier = Modifier.padding(horizontal = 12.dp, vertical = 16.dp),
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.smaller),
-    ) {
-      val boostVolume = mpvVolume - 100
-      Text(
-        getVolumeSliderText(volume, mpvVolume, boostVolume, percentage, displayAsPercentage),
-        style = MaterialTheme.typography.bodySmall,
-        textAlign = TextAlign.Center,
-      )
-      VerticalSlider(
-        if (displayAsPercentage) percentage else volume,
-        if (displayAsPercentage) 0..100 else range,
-        overflowValue = boostVolume,
-        overflowRange = boostRange,
-      )
-      Icon(
-        when (percentage) {
-          0 -> Icons.AutoMirrored.Default.VolumeOff
-          in 0..30 -> Icons.AutoMirrored.Default.VolumeMute
-          in 30..60 -> Icons.AutoMirrored.Default.VolumeDown
-          in 60..100 -> Icons.AutoMirrored.Default.VolumeUp
-          else -> Icons.AutoMirrored.Default.VolumeOff
-        },
-        contentDescription = null,
-      )
+  val maxVolume = range.endInclusive.coerceAtLeast(1)
+  val boostCap = boostRange?.endInclusive ?: 0
+  val level =
+    if (boostCap > 0) {
+      if (mpvVolume > 100 && volume >= maxVolume) {
+        50f + (mpvVolume - 100).coerceAtMost(boostCap) * 50f / boostCap
+      } else {
+        volume * 50f / maxVolume
+      }
+    } else {
+      volume * 100f / maxVolume
     }
-  }
+  PillSlider(
+    fraction = level / 100f,
+    icon = if (level < 0.5f) Icons.AutoMirrored.Default.VolumeOff else Icons.AutoMirrored.Default.VolumeUp,
+    label = level.roundToInt().toString(),
+    modifier = modifier,
+  )
 }
 
 val getVolumeSliderText: @Composable (Int, Int, Int, Int, Boolean) -> String =

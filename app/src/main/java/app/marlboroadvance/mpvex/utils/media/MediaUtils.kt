@@ -58,7 +58,6 @@ object MediaUtils {
           val intent = Intent(Intent.ACTION_VIEW, source.uri)
           intent.setClass(context, PlayerActivity::class.java)
           intent.putExtra("internal_launch", true) // Enables subtitle autoload
-          intent.putExtra("file_path", source.path)
           launchSource?.let { intent.putExtra("launch_source", it) }
           
           // For playlist items, pass the title so it shows correctly in the player
@@ -80,15 +79,7 @@ object MediaUtils {
             } else {
               source
             }
-            val file = java.io.File(filePath)
-            val intent = Intent(Intent.ACTION_VIEW, Uri.fromFile(file))
-            intent.setClass(context, PlayerActivity::class.java)
-            intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            intent.putExtra("file_path", file.absolutePath)
-            launchSource?.let { intent.putExtra("launch_source", it) }
-            context.startActivity(intent)
-            return
+            Uri.fromFile(java.io.File(filePath))
           } else {
             // It's likely a network URI - parse normally
             val parsedUri = source.toUri()

@@ -347,9 +347,11 @@ fun GestureHandler(
           var lastVolumeValue = currentVolume
           var lastMPVVolumeValue = currentMPVVolume ?: 100
           var lastBrightnessValue = currentBrightness
-          val brightnessGestureSens = 0.001f
-          val volumeGestureSens = 0.017f
-          val mpvVolumeGestureSens = 0.017f
+          // A swipe of about 25% of the screen height covers the whole 0..100 range
+          val gestureRangePx = (size.height * 0.25f).coerceAtLeast(300f)
+          val brightnessGestureSens = 1f / gestureRangePx
+          val volumeLevelPerPx = 100f / gestureRangePx
+          var volumeStartLevel = 0f
 
           // Original speed for long press
           var originalSpeed = playbackSpeed ?: 1f
@@ -493,55 +495,18 @@ fun GestureHandler(
                         val amount = currentPosition.y - startPosition.y
 
                         val changeVolume: () -> Unit = {
-                          val isIncreasingVolumeBoost: (Float) -> Boolean = {
-                            volumeBoostingCap > 0 && currentVolume == viewModel.maxVolume &&
-                              (currentMPVVolume ?: 100) - 100 < volumeBoostingCap && amount < 0
+                          if (startingY == 0f) {
+                            // Start from where the finger first touched so no movement is lost
+                            startingY = startPosition.y
+                            volumeStartLevel = viewModel.computeVolumeLevel()
                           }
-                          val isDecreasingVolumeBoost: (Float) -> Boolean = {
-                            volumeBoostingCap > 0 && currentVolume == viewModel.maxVolume &&
-                              (currentMPVVolume ?: 100) - 100 in 1..volumeBoostingCap && amount > 0
-                          }
-
-                          if (isIncreasingVolumeBoost(amount) || isDecreasingVolumeBoost(amount)) {
-                            if (mpvVolumeStartingY == 0f) {
-                              startingY = 0f
-                              originalVolume = currentVolume
-                              mpvVolumeStartingY = currentPosition.y
-                            }
-                            val newMPVVolume = calculateNewVerticalGestureValue(
-                              originalMPVVolume ?: 100,
-                              mpvVolumeStartingY,
-                              currentPosition.y,
-                              mpvVolumeGestureSens,
-                            ).coerceIn(100..volumeBoostingCap + 100)
-
-                            if (newMPVVolume != lastMPVVolumeValue) {
-                              viewModel.changeMPVVolumeTo(newMPVVolume)
-                              lastMPVVolumeValue = newMPVVolume
-                            }
-                          } else {
-                            if (startingY == 0f) {
-                              mpvVolumeStartingY = 0f
-                              originalMPVVolume = currentMPVVolume
-                              startingY = currentPosition.y
-                            }
-                            val newVolume = calculateNewVerticalGestureValue(
-                              originalVolume,
-                              startingY,
-                              currentPosition.y,
-                              volumeGestureSens,
-                            )
-
-                            if (newVolume != lastVolumeValue) {
-                              viewModel.changeVolumeTo(newVolume)
-                              lastVolumeValue = newVolume
-                            }
-                          }
-
+                          viewModel.setVolumeLevel(
+                            volumeStartLevel + (startingY - currentPosition.y) * volumeLevelPerPx,
+                          )
                           viewModel.displayVolumeSlider()
                         }
                         val changeBrightness: () -> Unit = {
-                          if (startingY == 0f) startingY = currentPosition.y
+                          if (startingY == 0f) startingY = startPosition.y
                           val newBrightness = calculateNewVerticalGestureValue(
                             originalBrightness,
                             startingY,

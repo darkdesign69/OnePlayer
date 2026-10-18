@@ -114,6 +114,9 @@ class PlayerViewModel(
 
   // Audio state
   val currentVolume = MutableStateFlow(host.audioManager.getStreamVolume(AudioManager.STREAM_MUSIC))
+
+  /** Volume shown on screen, 0..100. 0..50 = phone volume, 51..100 = boosted volume. */
+  val volumeLevel = MutableStateFlow(0)
   private val volumeBoostCap by MPVLib.propInt["volume-max"].collectAsState(viewModelScope)
 
   init {
@@ -718,11 +721,11 @@ class PlayerViewModel(
   fun showControls() {
     if (sheetShown.value != Sheets.None || panelShown.value != Panels.None) return
     try {
-      if (playerPreferences.showSystemStatusBar.get()) {
+      if (!playerPreferences.keepSystemBarsVisible.get() && playerPreferences.showSystemStatusBar.get()) {
         host.windowInsetsController.show(WindowInsetsCompat.Type.statusBars())
         host.windowInsetsController.isAppearanceLightStatusBars = false
       }
-      if (playerPreferences.showSystemNavigationBar.get()) {
+      if (!playerPreferences.keepSystemBarsVisible.get() && playerPreferences.showSystemNavigationBar.get()) {
         host.windowInsetsController.show(WindowInsetsCompat.Type.navigationBars())
       }
     } catch (e: Exception) {
@@ -735,10 +738,10 @@ class PlayerViewModel(
 
   fun hideControls() {
     try {
-      if (playerPreferences.showSystemStatusBar.get()) {
+      if (!playerPreferences.keepSystemBarsVisible.get() && playerPreferences.showSystemStatusBar.get()) {
         host.windowInsetsController.hide(WindowInsetsCompat.Type.statusBars())
       }
-      if (playerPreferences.showSystemNavigationBar.get()) {
+      if (!playerPreferences.keepSystemBarsVisible.get() && playerPreferences.showSystemNavigationBar.get()) {
         host.windowInsetsController.hide(WindowInsetsCompat.Type.navigationBars())
       }
     } catch (e: Exception) {
@@ -750,10 +753,10 @@ class PlayerViewModel(
 
   fun autoHideControls() {
     try {
-      if (playerPreferences.showSystemStatusBar.get()) {
+      if (!playerPreferences.keepSystemBarsVisible.get() && playerPreferences.showSystemStatusBar.get()) {
         host.windowInsetsController.hide(WindowInsetsCompat.Type.statusBars())
       }
-      if (playerPreferences.showSystemNavigationBar.get()) {
+      if (!playerPreferences.keepSystemBarsVisible.get() && playerPreferences.showSystemNavigationBar.get()) {
         host.windowInsetsController.hide(WindowInsetsCompat.Type.navigationBars())
       }
     } catch (e: Exception) {
@@ -915,20 +918,45 @@ class PlayerViewModel(
     brightnessSliderTimestamp.value = System.currentTimeMillis()
   }
 
-  fun changeVolumeBy(change: Int) {
-    val mpvVolume = MPVLib.getPropertyInt("volume")
-    val absoluteMaxVolume = volumeBoostCap ?: (audioPreferences.volumeBoostCap.get() + 100)
+  /** How many points above 100 the boosted volume may go (0 = boost disabled). */
+  private fun boostRange(): Int =
+    ((volumeBoostCap ?: (audioPreferences.volumeBoostCap.get() + 100)) - 100).coerceAtLeast(0)
 
-    if (absoluteMaxVolume > 100 && currentVolume.value == maxVolume) {
-      if (mpvVolume == 100 && change < 0) {
-        changeVolumeTo(currentVolume.value + change)
-      }
-      val finalMPVVolume = (mpvVolume?.plus(change))?.coerceAtLeast(100) ?: 100
-      if (finalMPVVolume in 100..absoluteMaxVolume) {
-        return changeMPVVolumeTo(finalMPVVolume)
-      }
+  /**
+   * Current volume on the 0..100 scale: the first half is the phone's own volume (0..max),
+   * the second half is the boosted volume above the phone's maximum.
+   */
+  fun computeVolumeLevel(): Float {
+    val boost = boostRange()
+    val device = host.audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+    val mpv = MPVLib.getPropertyInt("volume") ?: 100
+    val deviceTop = if (boost > 0) 50f else 100f
+    return if (boost > 0 && mpv > 100 && device >= maxVolume) {
+      50f + (mpv - 100).coerceAtMost(boost) * 50f / boost
+    } else {
+      device * deviceTop / maxVolume.coerceAtLeast(1)
     }
-    changeVolumeTo(currentVolume.value + change)
+  }
+
+  /** Sets the volume from the 0..100 scale (0..50 phone volume, 51..100 boosted). */
+  fun setVolumeLevel(level: Float) {
+    val clamped = level.coerceIn(0f, 100f)
+    val boost = boostRange()
+    val deviceTop = if (boost > 0) 50f else 100f
+    val device = Math.round(minOf(clamped, deviceTop) / deviceTop * maxVolume)
+    if (device != currentVolume.value) {
+      changeVolumeTo(device)
+    }
+    val mpv = if (boost > 0 && clamped > 50f) 100 + Math.round((clamped - 50f) / 50f * boost) else 100
+    if ((MPVLib.getPropertyInt("volume") ?: 100) != mpv) {
+      changeMPVVolumeTo(mpv)
+    }
+    volumeLevel.value = Math.round(clamped)
+  }
+
+  fun changeVolumeBy(change: Int) {
+    val step = 50f / maxVolume.coerceAtLeast(1)
+    setVolumeLevel(computeVolumeLevel() + change * step)
   }
 
   fun changeVolumeTo(volume: Int) {

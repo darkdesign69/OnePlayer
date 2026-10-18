@@ -16,6 +16,7 @@ import androidx.compose.material.icons.outlined.Audiotrack
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Gesture
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Palette
@@ -138,6 +139,26 @@ object PreferencesScreen : Screen {
               
               PreferenceDivider()
               
+              Preference(
+                title = { Text(text = "Customize theme") },
+                summary = {
+                  Text(
+                    text = "Background picture or color, accent color, transparency and blur",
+                    color = MaterialTheme.colorScheme.outline,
+                  )
+                },
+                icon = {
+                  Icon(
+                    Icons.Outlined.Image,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                  )
+                },
+                onClick = { backstack.add(CustomizeThemeScreen) },
+              )
+
+              PreferenceDivider()
+
               Preference(
 
                 title = { Text(text = stringResource(id = R.string.pref_layout_title)) },
