@@ -103,7 +103,7 @@ fun VideoCard(
     colors = CardDefaults. cardColors(containerColor = Color. Transparent),
   ) {
     if (isGridMode) {
-      // GRID LAYOUT - Vertical arrangement
+      // GRID LAYOUT - compact square thumbnails, three items per row
       Column(
         modifier = Modifier
           . fillMaxWidth()
@@ -114,12 +114,12 @@ fun VideoCard(
               Color. Transparent
             },
           )
-          .padding(12.dp),
+          .padding(3.dp),
         horizontalAlignment = if (gridColumns == 1) Alignment.Start else Alignment.CenterHorizontally,
       ) {
         val thumbnailRepository = koinInject<ThumbnailRepository>()
         val thumbWidthDp = 160.dp
-        val aspect = 16f / 9f
+        val aspect = 1f
         val thumbWidthPx = with(LocalDensity.current) { thumbWidthDp.roundToPx() }
         val thumbHeightPx = (thumbWidthPx / aspect).roundToInt()
 
@@ -161,7 +161,7 @@ fun VideoCard(
           modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(aspect)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(6.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .combinedClickable(
               onClick = onThumbClick,
@@ -386,9 +386,9 @@ fun VideoCard(
         verticalAlignment = Alignment.CenterVertically,
       ) {
         val thumbnailRepository = koinInject<ThumbnailRepository>()
-        // Rectangular thumbnail (16:9) with fixed width; height derives from aspect ratio
+        // Compact square-grid thumbnail; height derives from the square aspect ratio
         val thumbWidthDp = 128.dp
-        val aspect = 16f / 9f
+        val aspect = 1f
         val thumbWidthPx = with(LocalDensity.current) { thumbWidthDp.roundToPx() }
         val thumbHeightPx = (thumbWidthPx / aspect).roundToInt()
 

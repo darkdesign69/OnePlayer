@@ -730,7 +730,7 @@ private fun VideoListContent(
 
         val columns = when (mediaLayoutMode) {
           MediaLayoutMode.LIST -> 1
-          MediaLayoutMode.GRID -> videoGridColumns
+          MediaLayoutMode.GRID -> 3
         }
 
         if (mediaLayoutMode == MediaLayoutMode.GRID) {
@@ -751,11 +751,11 @@ private fun VideoListContent(
                 state = gridState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
-                  start = 8.dp,
-                  end = 8.dp,
+                  start = 4.dp,
+                  end = 4.dp,
                   bottom = if (showFloatingBottomBar) 88.dp else 16.dp
                 ),
-              horizontalArrangement = Arrangement.spacedBy(8.dp),
+              horizontalArrangement = Arrangement.spacedBy(6.dp),
               verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
             items(
@@ -780,7 +780,7 @@ private fun VideoListContent(
                   { onVideoClick(videoWithInfo.video) }
                 },
                 isGridMode = mediaLayoutMode == MediaLayoutMode.GRID,
-                gridColumns = videoGridColumns,
+                gridColumns = 3,
                 showSubtitleIndicator = showSubtitleIndicator,
                 allowThumbnailGeneration = false,
               )
