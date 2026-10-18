@@ -48,12 +48,8 @@ class App : Application() {
       }
     }
     
-    // Trigger media scan on app launch to detect new videos
-    applicationScope.launch {
-      runCatching {
-        triggerMediaScanOnLaunch()
-      }
-    }
+    // The full-storage media scan that used to run at every launch was removed: it kept the phone busy
+    // right when the app opens and forced the folder list to reload. Pull down to refresh instead.
   }
   
   /**

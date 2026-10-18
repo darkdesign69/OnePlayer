@@ -754,7 +754,7 @@ private fun GridContent(
       horizontalArrangement = Arrangement.spacedBy(4.dp),
       verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-      items(folders.size) { index ->
+      items(folders.size, key = { index -> folders[index].bucketId }) { index ->
         val folder = folders[index]
         val isRecentlyPlayed = recentlyPlayedFilePath?.let { filePath ->
           val file = File(filePath)

@@ -134,9 +134,11 @@ class FolderListViewModel(
         // Save to cache for next app launch (save unfiltered list)
         saveFoldersToCache(_allVideoFolders.value)
 
-        // Preload video cache in background so tapping any folder is instant 0ms
-        for (folder in filteredFolders) {
-          app.marlboroadvance.mpvex.repository.VideoStatCache.preload(getApplication(), folder.bucketId)
+        // Preload video cache in the background, OFF the main thread, so tapping any folder is instant
+        kotlinx.coroutines.withContext(Dispatchers.IO) {
+          for (folder in filteredFolders) {
+            app.marlboroadvance.mpvex.repository.VideoStatCache.preload(getApplication(), folder.bucketId)
+          }
         }
       }
     }

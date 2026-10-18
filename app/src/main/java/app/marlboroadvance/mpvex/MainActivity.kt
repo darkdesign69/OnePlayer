@@ -175,22 +175,10 @@ class MainActivity : ComponentActivity() {
         onBack = { typedBackstack.removeLastOrNull() },
         entryProvider = { route -> NavEntry(route) { route.Content() } },
         popTransitionSpec = {
-          (
-            fadeIn(animationSpec = tween(220)) +
-              slideIn(animationSpec = tween(220)) { IntOffset(-it.width / 2, 0) }
-          ) togetherWith (
-              fadeOut(animationSpec = tween(220)) +
-                slideOut(animationSpec = tween(220)) { IntOffset(it.width / 2, 0) }
-          )
+          fadeIn(animationSpec = tween(140)) togetherWith fadeOut(animationSpec = tween(90))
         },
         transitionSpec = {
-          (
-            fadeIn(animationSpec = tween(220)) +
-              slideIn(animationSpec = tween(220)) { IntOffset(it.width / 2, 0) }
-          ) togetherWith (
-              fadeOut(animationSpec = tween(220)) +
-                slideOut(animationSpec = tween(220)) { IntOffset(-it.width / 2, 0) }
-          )
+          fadeIn(animationSpec = tween(140)) togetherWith fadeOut(animationSpec = tween(90))
         },
         predictivePopTransitionSpec = {
           (
