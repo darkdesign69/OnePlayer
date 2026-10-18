@@ -1,10 +1,12 @@
 package app.marlboroadvance.mpvex.ui.browser.cards
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -25,10 +27,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.domain.media.model.VideoFolder
+import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.BrowserPreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
@@ -113,55 +118,68 @@ fun FolderCard(
           modifier = Modifier
             .width(thumbWidthDp)
             .height(thumbHeightDp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .combinedClickable(
               onClick = onThumbClick,
               onLongClick = onLongClick,
             ),
           contentAlignment = Alignment.Center,
         ) {
-          Icon(
-            customIcon ?: Icons.Filled.Folder,
-            contentDescription = "Folder",
-            modifier = Modifier.size(56.dp),
-            tint = MaterialTheme.colorScheme.secondary,
-          )
-
-          if (newVideoCount > 0) {
-            Box(
-              modifier =
-                Modifier
-                  .align(Alignment.TopEnd)
-                  .padding(6.dp)
-                  .clip(RoundedCornerShape(4.dp))
-                  .background(Color(0xFFD32F2F))
-                  .padding(horizontal = 6.dp, vertical = 2.dp),
-            ) {
-              Text(
-                text = newVideoCount.toString(),
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = FontWeight.Bold,
-                ),
-                color = Color.White,
+          // Plain folder icon, no box around it
+          Box(
+            modifier = Modifier
+              .height(thumbHeightDp)
+              .aspectRatio(1.15f),
+          ) {
+            if (customIcon != null) {
+              Icon(
+                customIcon,
+                contentDescription = "Folder",
+                modifier = Modifier.fillMaxSize(),
+                tint = MaterialTheme.colorScheme.secondary,
+              )
+            } else {
+              Image(
+                painter = painterResource(id = R.drawable.ic_folder_flat),
+                contentDescription = "Folder",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit,
               )
             }
-          }
-          
-          if (showTotalDurationChip && folder.totalDuration > 0) {
-            Box(
-              modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(6.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(Color.Black.copy(alpha = 0.65f))
-                .padding(horizontal = 6.dp, vertical = 2.dp),
-            ) {
-              Text(
-                text = formatDuration(folder.totalDuration),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White,
-              )
+
+            if (newVideoCount > 0) {
+              Box(
+                modifier =
+                  Modifier
+                    .align(Alignment.TopEnd)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFFD32F2F))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+              ) {
+                Text(
+                  text = newVideoCount.toString(),
+                  style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                  ),
+                  color = Color.White,
+                )
+              }
+            }
+
+            if (showTotalDurationChip && folder.totalDuration > 0) {
+              Box(
+                modifier = Modifier
+                  .align(Alignment.BottomEnd)
+                  .padding(4.dp)
+                  .clip(RoundedCornerShape(4.dp))
+                  .background(Color.Black.copy(alpha = 0.65f))
+                  .padding(horizontal = 6.dp, vertical = 2.dp),
+              ) {
+                Text(
+                  text = formatDuration(folder.totalDuration),
+                  style = MaterialTheme.typography.labelSmall,
+                  color = Color.White,
+                )
+              }
             }
           }
         }
@@ -200,43 +218,55 @@ fun FolderCard(
           modifier =
             Modifier
               .size(64.dp)
-              .clip(RoundedCornerShape(12.dp))
-              .background(MaterialTheme.colorScheme.surfaceContainerHigh)
               .combinedClickable(
                 onClick = onThumbClick,
                 onLongClick = onLongClick,
               ),
           contentAlignment = Alignment.Center,
         ) {
-          Icon(
-            customIcon ?: Icons.Filled.Folder,
-            contentDescription = "Folder",
-            modifier = Modifier.size(48.dp),
-            tint = MaterialTheme.colorScheme.secondary,
-          )
-
-          // Show new video count badge if folder contains new videos
-          if (newVideoCount > 0) {
-            Box(
-              modifier =
-                Modifier
-                  .align(Alignment.TopEnd)
-                  .padding(4.dp)
-                  .clip(RoundedCornerShape(4.dp))
-                  .background(Color(0xFFD32F2F)) // Warning red color
-                  .padding(horizontal = 6.dp, vertical = 2.dp),
-            ) {
-              Text(
-              	text = newVideoCount.toString(),
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = FontWeight.Bold,
-                ),
-                color = Color.White,
+          // Plain folder icon, no box around it
+          Box(
+            modifier =
+              Modifier
+                .height(52.dp)
+                .aspectRatio(1.15f),
+          ) {
+            if (customIcon != null) {
+              Icon(
+                customIcon,
+                contentDescription = "Folder",
+                modifier = Modifier.fillMaxSize(),
+                tint = MaterialTheme.colorScheme.secondary,
+              )
+            } else {
+              Image(
+                painter = painterResource(id = R.drawable.ic_folder_flat),
+                contentDescription = "Folder",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit,
               )
             }
+
+            // Show new video count badge if folder contains new videos
+            if (newVideoCount > 0) {
+              Box(
+                modifier =
+                  Modifier
+                    .align(Alignment.TopEnd)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFFD32F2F))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+              ) {
+                Text(
+                  text = newVideoCount.toString(),
+                  style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                  ),
+                  color = Color.White,
+                )
+              }
+            }
           }
-
-
         }
         Spacer(modifier = Modifier.width(16.dp))
         Column(
