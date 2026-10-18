@@ -285,7 +285,7 @@ fun MpvexTheme(
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .background(baseColorScheme.background.copy(alpha = 0.25f)),
+                            .background(backgroundScrim(baseColorScheme.background, accentColor)),
                 )
                 content()
             }

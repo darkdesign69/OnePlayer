@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,13 +39,18 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -80,6 +86,7 @@ object CustomizeThemeScreen : Screen {
     val backstack = LocalBackStack.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var showColorPicker by remember { mutableStateOf(false) }
 
     val mode by preferences.customBackground.collectAsState()
     val version by preferences.customBackgroundVersion.collectAsState()
@@ -102,6 +109,17 @@ object CustomizeThemeScreen : Screen {
       }
     val launchPicker = {
       pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
+
+    if (showColorPicker) {
+      ColorPickerDialog(
+        initial = if (accent != 0) Color(accent) else MaterialTheme.colorScheme.primary,
+        onDismiss = { showColorPicker = false },
+        onPick = { picked ->
+          preferences.customAccent.set(picked.toArgb())
+          showColorPicker = false
+        },
+      )
     }
 
     val hasSavedPhoto = backgroundImageFile(context).exists()
@@ -276,6 +294,10 @@ object CustomizeThemeScreen : Screen {
                     onClick = { preferences.customAccent.set(color.toArgb()) },
                   )
                 }
+                CustomColorDot(
+                  selected = accent != 0 && AccentColors.none { it.toArgb() == accent },
+                  onClick = { showColorPicker = true },
+                )
               }
             }
 
@@ -412,4 +434,75 @@ private fun LabeledSlider(
       modifier = Modifier.weight(1f),
     )
   }
+}
+
+@Composable
+private fun CustomColorDot(
+  selected: Boolean,
+  onClick: () -> Unit,
+) {
+  Box(
+    modifier =
+      Modifier
+        .size(36.dp)
+        .clip(CircleShape)
+        .background(
+          Brush.sweepGradient(
+            listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red),
+          ),
+        ).border(
+          width = if (selected) 2.dp else 1.dp,
+          color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outlineVariant,
+          shape = CircleShape,
+        ).clickable(onClick = onClick),
+    contentAlignment = Alignment.Center,
+  ) {
+    if (selected) {
+      Icon(
+        Icons.Filled.Check,
+        contentDescription = null,
+        tint = Color.White,
+        modifier = Modifier.size(18.dp),
+      )
+    }
+  }
+}
+
+/** Pick any colour: hue, strength and brightness. */
+@Composable
+private fun ColorPickerDialog(
+  initial: Color,
+  onDismiss: () -> Unit,
+  onPick: (Color) -> Unit,
+) {
+  val start = remember { FloatArray(3).also { android.graphics.Color.colorToHSV(initial.toArgb(), it) } }
+  var hue by remember { mutableStateOf(start[0]) }
+  var strength by remember { mutableStateOf(start[1].coerceIn(0.15f, 1f)) }
+  var brightness by remember { mutableStateOf(start[2].coerceIn(0.3f, 1f)) }
+  val picked = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, strength, brightness)))
+
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text("Choose your color") },
+    text = {
+      Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(
+          modifier =
+            Modifier
+              .fillMaxWidth()
+              .height(48.dp)
+              .clip(RoundedCornerShape(12.dp))
+              .background(picked),
+        )
+        Text(text = "Color", style = MaterialTheme.typography.bodyMedium)
+        Slider(value = hue, onValueChange = { hue = it }, valueRange = 0f..360f)
+        Text(text = "Strength", style = MaterialTheme.typography.bodyMedium)
+        Slider(value = strength, onValueChange = { strength = it }, valueRange = 0.15f..1f)
+        Text(text = "Brightness", style = MaterialTheme.typography.bodyMedium)
+        Slider(value = brightness, onValueChange = { brightness = it }, valueRange = 0.3f..1f)
+      }
+    },
+    confirmButton = { TextButton(onClick = { onPick(picked) }) { Text("Select") } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+  )
 }

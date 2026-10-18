@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import app.marlboroadvance.mpvex.ui.theme.rememberAccentColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -144,6 +145,7 @@ fun FolderCard(
                 contentDescription = "Folder",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit,
+                colorFilter = rememberAccentColorFilter(),
               )
             }
 
@@ -245,6 +247,7 @@ fun FolderCard(
                 contentDescription = "Folder",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit,
+                colorFilter = rememberAccentColorFilter(),
               )
             }
 

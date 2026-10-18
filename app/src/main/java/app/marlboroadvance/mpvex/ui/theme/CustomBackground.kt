@@ -13,11 +13,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
@@ -29,6 +32,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import app.marlboroadvance.mpvex.preferences.AppearancePreferences
+import app.marlboroadvance.mpvex.preferences.preference.collectAsState
+import org.koin.compose.koinInject
 import java.io.File
 
 /** Customize Theme: background modes are stored as "none", "image" or "preset:<id>". */
@@ -196,28 +202,94 @@ fun CustomBackgroundLayer(
 
 /** Makes the app's screens and panels see-through so the background shows. */
 fun ColorScheme.withTransparentPanels(transparency: Float): ColorScheme {
-  val panelAlpha = 1f - transparency.coerceIn(0f, 1f) * 0.85f
+  val t = transparency.coerceIn(0f, 1f)
+  val panelAlpha = 1f - t * 0.85f
+  // Selected items, chips and buttons stay a little more solid so they remain easy to see
+  val accentAlpha = 1f - t * 0.55f
   return copy(
     background = Color.Transparent,
     surface = Color.Transparent,
+    surfaceDim = surfaceDim.copy(alpha = panelAlpha),
     surfaceContainerLowest = surfaceContainerLowest.copy(alpha = panelAlpha),
     surfaceContainerLow = surfaceContainerLow.copy(alpha = panelAlpha),
     surfaceContainer = surfaceContainer.copy(alpha = panelAlpha),
     surfaceVariant = surfaceVariant.copy(alpha = panelAlpha),
+    primaryContainer = primaryContainer.copy(alpha = accentAlpha),
+    secondaryContainer = secondaryContainer.copy(alpha = accentAlpha),
+    tertiaryContainer = tertiaryContainer.copy(alpha = accentAlpha),
   )
 }
 
-/** Applies the user's accent colour to the main highlight colours. */
+/** Applies the user's own colour across the whole app: highlights, buttons, bars and tinted panels. */
 fun ColorScheme.withAccent(accent: Color): ColorScheme {
-  val onAccent = if (accent.luminance() > 0.5f) Color.Black else Color.White
+  fun onColor(c: Color): Color = if (c.luminance() > 0.5f) Color.Black else Color.White
+  val secondaryTone = lerp(accent, onSurface, 0.30f)
+  val tertiaryTone = lerp(accent, onSurface, 0.45f)
   val container = lerp(surfaceContainerHigh, accent, 0.35f)
+  val softContainer = lerp(surfaceContainerHigh, accent, 0.25f)
   return copy(
     primary = accent,
-    onPrimary = onAccent,
+    onPrimary = onColor(accent),
     primaryContainer = container,
     onPrimaryContainer = onSurface,
-    secondaryContainer = container,
+    inversePrimary = lerp(accent, Color.White, 0.4f),
+    secondary = secondaryTone,
+    onSecondary = onColor(secondaryTone),
+    secondaryContainer = softContainer,
     onSecondaryContainer = onSurface,
+    tertiary = tertiaryTone,
+    onTertiary = onColor(tertiaryTone),
+    tertiaryContainer = softContainer,
+    onTertiaryContainer = onSurface,
     surfaceTint = accent,
+    surfaceContainerLowest = lerp(surfaceContainerLowest, accent, 0.06f),
+    surfaceContainerLow = lerp(surfaceContainerLow, accent, 0.08f),
+    surfaceContainer = lerp(surfaceContainer, accent, 0.10f),
+    surfaceContainerHigh = lerp(surfaceContainerHigh, accent, 0.12f),
+    surfaceContainerHighest = lerp(surfaceContainerHighest, accent, 0.14f),
+    surfaceVariant = lerp(surfaceVariant, accent, 0.10f),
+    outlineVariant = lerp(outlineVariant, accent, 0.20f),
   )
+}
+
+/** Colour of the soft layer drawn over the background picture; it takes on the user's colour. */
+fun backgroundScrim(
+  base: Color,
+  accent: Int,
+): Color = (if (accent != 0) lerp(base, Color(accent), 0.35f) else base).copy(alpha = 0.28f)
+
+/** The user's chosen colour, or [default] when none was chosen. */
+@Composable
+fun rememberAccentOrDefault(default: Color): Color {
+  val preferences = koinInject<AppearancePreferences>()
+  val accent by preferences.customAccent.collectAsState()
+  return if (accent != 0) Color(accent) else default
+}
+
+/** Colours the two-tone folder picture with the user's colour; null keeps the original blue. */
+@Composable
+fun rememberAccentColorFilter(): ColorFilter? {
+  val preferences = koinInject<AppearancePreferences>()
+  val accent by preferences.customAccent.collectAsState()
+  return remember(accent) {
+    if (accent == 0) {
+      null
+    } else {
+      val c = Color(accent)
+      val s = 1.75f
+      val wr = 0.299f * s
+      val wg = 0.587f * s
+      val wb = 0.114f * s
+      ColorFilter.colorMatrix(
+        ColorMatrix(
+          floatArrayOf(
+            wr * c.red, wg * c.red, wb * c.red, 0f, 0f,
+            wr * c.green, wg * c.green, wb * c.green, 0f, 0f,
+            wr * c.blue, wg * c.blue, wb * c.blue, 0f, 0f,
+            0f, 0f, 0f, 1f, 0f,
+          ),
+        ),
+      )
+    }
+  }
 }

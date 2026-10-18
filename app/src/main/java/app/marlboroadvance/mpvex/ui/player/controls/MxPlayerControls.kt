@@ -61,6 +61,7 @@ import app.marlboroadvance.mpvex.ui.player.PlayerViewModel
 import app.marlboroadvance.mpvex.ui.player.Sheets
 import app.marlboroadvance.mpvex.ui.player.VideoAspect
 import app.marlboroadvance.mpvex.ui.player.controls.components.SeekbarWithTimers
+import app.marlboroadvance.mpvex.ui.theme.rememberAccentOrDefault
 import dev.vivvvek.seeker.Segment
 import kotlinx.collections.immutable.toImmutableList
 import org.koin.compose.koinInject
@@ -383,6 +384,7 @@ private fun MxThinSeekBar(
   modifier: Modifier = Modifier,
 ) {
   var dragFraction by remember { mutableStateOf<Float?>(null) }
+  val progressColor = rememberAccentOrDefault(Color.White)
   val fraction = dragFraction ?: if (duration > 0f) (position / duration).coerceIn(0f, 1f) else 0f
 
   Box(
@@ -447,13 +449,13 @@ private fun MxThinSeekBar(
         cap = StrokeCap.Round,
       )
       drawLine(
-        color = Color.White,
+        color = progressColor,
         start = Offset(startX, y),
         end = Offset(progressX, y),
         strokeWidth = trackHeight,
         cap = StrokeCap.Round,
       )
-      drawCircle(color = Color.White, radius = 7.dp.toPx(), center = Offset(progressX, y))
+      drawCircle(color = progressColor, radius = 7.dp.toPx(), center = Offset(progressX, y))
     }
   }
 }
