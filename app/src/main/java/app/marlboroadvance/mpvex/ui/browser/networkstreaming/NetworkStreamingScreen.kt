@@ -121,7 +121,7 @@ object NetworkStreamingScreen : Screen {
             isInSelectionMode = false,
             selectedCount = 0,
             totalCount = 0,
-            onBackClick = null, // No back button for network screen (root tab)
+            onBackClick = { backstack.removeLastOrNull() },
             onCancelSelection = { },
           onSortClick = null,
           // Search functionality disabled for production

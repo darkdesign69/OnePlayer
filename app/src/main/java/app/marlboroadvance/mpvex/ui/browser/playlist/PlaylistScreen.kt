@@ -223,7 +223,7 @@ object PlaylistScreen : Screen {
               isInSelectionMode = selectionManager.isInSelectionMode,
               selectedCount = selectionManager.selectedCount,
               totalCount = playlistsWithCount.size,
-              onBackClick = null,
+              onBackClick = { backStack.removeLastOrNull() },
               onCancelSelection = { selectionManager.clear() },
               isSingleSelection = selectionManager.isSingleSelection,
               onSearchClick = { isSearching = true },

@@ -191,7 +191,7 @@ object RecentlyPlayedScreen : Screen {
             isInSelectionMode = selectionManager.isInSelectionMode,
             selectedCount = selectionManager.selectedCount,
             totalCount = recentItems.size,
-            onBackClick = null, // No back button for recently played screen
+            onBackClick = { backStack.removeLastOrNull() },
             onCancelSelection = { selectionManager.clear() },
             onSortClick = null, // No sorting in recently played
             onSettingsClick = {

@@ -11,13 +11,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.automirrored.outlined.ViewQuilt
 import androidx.compose.material.icons.outlined.Audiotrack
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Gesture
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
+import app.marlboroadvance.mpvex.ui.browser.recentlyplayed.RecentlyPlayedScreen
+import app.marlboroadvance.mpvex.ui.browser.playlist.PlaylistScreen
+import app.marlboroadvance.mpvex.ui.browser.networkstreaming.NetworkStreamingScreen
+import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PlayCircle
@@ -112,6 +118,73 @@ object PreferencesScreen : Screen {
             }
           }
           
+          // Library section (these used to be tabs at the bottom of the app)
+          item {
+            PreferenceSectionHeader(title = "Library")
+          }
+
+          item {
+            PreferenceCard {
+              Preference(
+                title = { Text(text = "Recents") },
+                summary = {
+                  Text(
+                    text = "Videos you played recently",
+                    color = MaterialTheme.colorScheme.outline,
+                  )
+                },
+                icon = {
+                  Icon(
+                    Icons.Outlined.History,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                  )
+                },
+                onClick = { backstack.add(RecentlyPlayedScreen) },
+              )
+
+              PreferenceDivider()
+
+              Preference(
+                title = { Text(text = "Playlists") },
+                summary = {
+                  Text(
+                    text = "Your video playlists",
+                    color = MaterialTheme.colorScheme.outline,
+                  )
+                },
+                icon = {
+                  Icon(
+                    Icons.AutoMirrored.Outlined.PlaylistPlay,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                  )
+                },
+                onClick = { backstack.add(PlaylistScreen) },
+              )
+
+              PreferenceDivider()
+
+              Preference(
+                title = { Text(text = "Network") },
+                summary = {
+                  Text(
+                    text = "Stream from network shares and links",
+                    color = MaterialTheme.colorScheme.outline,
+                  )
+                },
+                icon = {
+                  Icon(
+                    Icons.Outlined.Language,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                  )
+                },
+                onClick = { backstack.add(NetworkStreamingScreen) },
+              )
+            }
+          }
+
           // UI & Appearance Section
           item {
             PreferenceSectionHeader(title = "UI & Appearance")
