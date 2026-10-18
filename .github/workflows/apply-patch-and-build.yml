@@ -1,0 +1,68 @@
+name: Apply Patch and Build APK
+
+on:
+  push:
+    paths:
+      - '*.zip'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply any zip uploaded in this push
+        run: |
+          : > /tmp/new_zips.txt
+          if [ "${{ github.event_name }}" = "push" ]; then
+            git diff --name-only --diff-filter=AM "${{ github.event.before }}" "${{ github.sha }}" -- '*.zip' | grep -v '/' > /tmp/new_zips.txt || true
+          fi
+          if [ -s /tmp/new_zips.txt ]; then
+            while IFS= read -r zipfile; do
+              echo "Applying: $zipfile"
+              cp "$zipfile" /tmp/current.zip
+              if echo "$zipfile" | grep -qi 'full'; then
+                echo "Full project zip: replacing all existing project files"
+                git ls-files -z | grep -zv '^\.github/' | xargs -0 -r git rm -q -f --
+              fi
+              rm -rf /tmp/patch && mkdir -p /tmp/patch
+              unzip -q -o /tmp/current.zip -d /tmp/patch
+              src=/tmp/patch
+              if [ "$(ls -A /tmp/patch | wc -l)" -eq 1 ]; then
+                only="$(ls -A /tmp/patch)"
+                if [ -d "/tmp/patch/$only" ] && [ "$only" != "app" ] && [ "$only" != ".github" ]; then
+                  src="/tmp/patch/$only"
+                fi
+              fi
+              cp -a "$src"/. .
+            done < /tmp/new_zips.txt
+            git ls-files | grep -E '^[^/]+\.zip$' | while IFS= read -r z; do git rm -q -f -- "$z"; done || true
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "Apply uploaded patch" || echo "Nothing to commit"
+            git push
+          else
+            echo "No new zip in this push, building the current code"
+          fi
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: 17
+          cache: 'gradle'
+
+      - run: chmod +x ./gradlew
+      - run: ./gradlew assembleStandardDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: one-player-apk
+          path: app/build/outputs/apk/standard/debug/*arm64-v8a*.apk
+          if-no-files-found: error
