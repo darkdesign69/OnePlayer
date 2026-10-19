@@ -68,6 +68,8 @@ class MainActivity : ComponentActivity() {
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {
+    // Leave the launch (splash) theme and use the normal app theme
+    setTheme(app.marlboroadvance.mpvex.R.style.Theme_mpvex)
     super.onCreate(savedInstanceState)
     
     PermissionUtils.setMediaAccessLauncher(mediaAccessLauncher)

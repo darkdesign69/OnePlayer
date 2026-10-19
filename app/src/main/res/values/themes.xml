@@ -2,4 +2,9 @@
 <resources>
 
     <style name="Theme.mpvex" parent="Theme.Material3.DynamicColors.DayNight.NoActionBar" />
+
+    <!-- Used only while the app starts: the logo on a dark background instead of a blank screen -->
+    <style name="Theme.mpvex.Splash" parent="Theme.mpvex">
+        <item name="android:windowBackground">@drawable/splash_background</item>
+    </style>
 </resources>
