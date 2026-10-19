@@ -35,7 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import app.marlboroadvance.mpvex.ui.theme.rememberAccentOrDefault
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -157,7 +156,6 @@ private fun PillSlider(
     animationSpec = tween(durationMillis = 80),
     label = "pillsliderfill",
   )
-  val fillColor = rememberAccentOrDefault(Color.White)
   Column(
     modifier = modifier,
     horizontalAlignment = Alignment.CenterHorizontally,
@@ -184,13 +182,13 @@ private fun PillSlider(
             .fillMaxWidth()
             .fillMaxHeight(animatedFraction)
             .clip(RoundedCornerShape(15.dp))
-            .background(fillColor),
+            .background(Color.White),
       )
     }
     Icon(
       imageVector = icon,
       contentDescription = null,
-      tint = fillColor,
+      tint = Color.White,
       modifier = Modifier.size(28.dp),
     )
   }

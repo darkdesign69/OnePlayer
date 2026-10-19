@@ -61,7 +61,6 @@ import app.marlboroadvance.mpvex.ui.player.PlayerViewModel
 import app.marlboroadvance.mpvex.ui.player.Sheets
 import app.marlboroadvance.mpvex.ui.player.VideoAspect
 import app.marlboroadvance.mpvex.ui.player.controls.components.SeekbarWithTimers
-import app.marlboroadvance.mpvex.ui.theme.rememberAccentOrDefault
 import dev.vivvvek.seeker.Segment
 import kotlinx.collections.immutable.toImmutableList
 import org.koin.compose.koinInject
@@ -291,16 +290,7 @@ fun MxPortraitControls(
             .padding(top = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
       ) {
-        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-          IconButton(onClick = viewModel::lockControls) {
-            Icon(
-              imageVector = Icons.Default.LockOpen,
-              contentDescription = "Lock controls",
-              tint = Color.White,
-              modifier = Modifier.size(28.dp),
-            )
-          }
-        }
+        Spacer(modifier = Modifier.weight(1f))
 
         Row(
           horizontalArrangement = Arrangement.spacedBy(28.dp),
@@ -384,7 +374,6 @@ private fun MxThinSeekBar(
   modifier: Modifier = Modifier,
 ) {
   var dragFraction by remember { mutableStateOf<Float?>(null) }
-  val progressColor = rememberAccentOrDefault(Color.White)
   val fraction = dragFraction ?: if (duration > 0f) (position / duration).coerceIn(0f, 1f) else 0f
 
   Box(
@@ -449,13 +438,13 @@ private fun MxThinSeekBar(
         cap = StrokeCap.Round,
       )
       drawLine(
-        color = progressColor,
+        color = Color.White,
         start = Offset(startX, y),
         end = Offset(progressX, y),
         strokeWidth = trackHeight,
         cap = StrokeCap.Round,
       )
-      drawCircle(color = progressColor, radius = 7.dp.toPx(), center = Offset(progressX, y))
+      drawCircle(color = Color.White, radius = 7.dp.toPx(), center = Offset(progressX, y))
     }
   }
 }

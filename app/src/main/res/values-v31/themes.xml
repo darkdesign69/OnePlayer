@@ -4,6 +4,6 @@
     <style name="Theme.mpvex.Splash" parent="Theme.mpvex">
         <item name="android:windowBackground">@drawable/splash_background</item>
         <item name="android:windowSplashScreenBackground">@color/splash_background_color</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
     </style>
 </resources>
