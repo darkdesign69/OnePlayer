@@ -83,6 +83,15 @@ internal fun MusicPanelTheme(content: @Composable () -> Unit) {
   }
 }
 
+/** Background for menus, dialogs and sheets: always solid so the text stays readable. */
+@Composable
+internal fun popupColor(): Color {
+  val cs = MaterialTheme.colorScheme
+  val c = cs.surfaceContainerHigh
+  if (c.alpha >= 0.99f) return c
+  return lerp(solidSurface(), cs.primary, 0.10f)
+}
+
 /** A solid colour for full-screen layers such as Now playing (never see-through). */
 @Composable
 internal fun solidSurface(): Color {
@@ -242,6 +251,9 @@ private fun NowPlayingPage() {
     item { MsSwitch("Swipe cover to change song", MusicSettings.swipeCover) { msSave { MusicSettings.swipeCover = it } } }
     item { MsSwitch("Show favorite button", MusicSettings.showFavButton) { msSave { MusicSettings.showFavButton = it } } }
     item { MsSwitch("Show extra controls (queue, timer, speed, equalizer)", MusicSettings.showExtraControls) { msSave { MusicSettings.showExtraControls = it } } }
+    item { MsHeader("Lyrics") }
+    item { MsSwitch("Search lyrics on the web automatically", MusicSettings.lyricsAuto) { msSave { MusicSettings.lyricsAuto = it } } }
+    item { MsNote("Tap the lyrics button in Now playing. Synced lyrics scroll with the song, and found lyrics are saved on your phone. You can also edit or paste your own.") }
     item { MsHeader("Behavior") }
     item { MsSwitch("Open Now playing when a song starts", MusicSettings.openNowOnPlay) { msSave { MusicSettings.openNowOnPlay = it } } }
     item { MsSwitch("Keep screen on in Now playing", MusicSettings.keepScreenOn) { msSave { MusicSettings.keepScreenOn = it } } }

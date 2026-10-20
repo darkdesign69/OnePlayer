@@ -94,6 +94,21 @@ fun loadArt(
     } catch (_: Exception) {
     }
   }
+  if (bmp == null && track.id < 0) {
+    // files added by hand: read the cover stored inside the file
+    val r = android.media.MediaMetadataRetriever()
+    try {
+      r.setDataSource(context, track.uri)
+      val data = r.embeddedPicture
+      if (data != null) bmp = BitmapFactory.decodeByteArray(data, 0, data.size)
+    } catch (_: Exception) {
+    } finally {
+      try {
+        r.release()
+      } catch (_: Exception) {
+      }
+    }
+  }
   bmp?.let { artCache.put(key, it) }
   return bmp
 }

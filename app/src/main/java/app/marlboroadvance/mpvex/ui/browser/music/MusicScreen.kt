@@ -59,6 +59,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.Dialog
+import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -326,6 +332,25 @@ object MusicScreen : Screen {
           }
       }
 
+    val addScope = rememberCoroutineScope()
+    val addFilesLauncher =
+      rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) {
+          addScope.launch {
+            val list = withContext(Dispatchers.IO) { uris.mapNotNull { trackFromUri(context, it) } }
+            if (list.isEmpty()) {
+              Toast.makeText(context, "Could not read those files", Toast.LENGTH_SHORT).show()
+            } else if (MusicController.queue.isEmpty()) {
+              MusicController.play(list, 0, false)
+              openNow()
+            } else {
+              list.forEach { MusicController.addToQueue(it) }
+              Toast.makeText(context, "Added ${list.size} to the queue", Toast.LENGTH_SHORT).show()
+            }
+          }
+        }
+      }
+
     val actions =
       SongActions(
         playNext = {
@@ -415,7 +440,7 @@ object MusicScreen : Screen {
                 if (tab == 1) {
                   Box {
                     IconButton(onClick = { sortMenu = true }) { Icon(Icons.AutoMirrored.Filled.Sort, "Sort") }
-                    DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
+                    DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }, containerColor = popupColor()) {
                       sortNames.forEachIndexed { i, n ->
                         DropdownMenuItem(
                           text = { Text(n + if (i == sortBy) (if (sortDesc) "  ↓" else "  ↑") else "") },
@@ -428,6 +453,7 @@ object MusicScreen : Screen {
                     }
                   }
                 }
+                IconButton(onClick = { addFilesLauncher.launch(arrayOf("audio/*")) }) { Icon(Icons.Filled.Add, "Add files") }
                 IconButton(onClick = { settingsPage = -1; showSettings = true }) { Icon(Icons.Filled.Settings, "Music settings") }
               } else if (searching && query.isNotEmpty()) {
                 IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, "Clear") }
@@ -579,6 +605,7 @@ object MusicScreen : Screen {
     // ---- dialogs ----
     addTarget?.let { t ->
       AlertDialog(
+      containerColor = popupColor(),
         onDismissRequest = { addTarget = null },
         title = { Text("Add to playlist") },
         text = {
@@ -600,6 +627,7 @@ object MusicScreen : Screen {
     if (newPlaylistDialog || newPlaylistFor != null) {
       var name by remember { mutableStateOf("") }
       AlertDialog(
+      containerColor = popupColor(),
         onDismissRequest = { newPlaylistDialog = false; newPlaylistFor = null },
         title = { Text("New playlist") },
         text = { TextField(value = name, onValueChange = { name = it }, singleLine = true, placeholder = { Text("Playlist name") }) },
@@ -617,6 +645,7 @@ object MusicScreen : Screen {
     }
     infoTarget?.let { t ->
       AlertDialog(
+      containerColor = popupColor(),
         onDismissRequest = { infoTarget = null },
         title = { Text("Details") },
         text = {
@@ -762,7 +791,7 @@ private fun PlaylistsTab(
         PlaylistRow(name, "${MusicController.playlists[name].orEmpty().size} songs", Icons.AutoMirrored.Filled.QueueMusic, onLong = { menuFor = name }) {
           onOpen(Detail.ListD(name, "playlist"))
         }
-        DropdownMenu(expanded = menuFor == name, onDismissRequest = { menuFor = null }) {
+        DropdownMenu(expanded = menuFor == name, onDismissRequest = { menuFor = null }, containerColor = popupColor()) {
           DropdownMenuItem(
             text = { Text("Delete playlist") },
             leadingIcon = { Icon(Icons.Filled.Delete, null) },
@@ -902,7 +931,7 @@ private fun SongRow(
     }
     Box {
       IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, "More") }
-      DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+      DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = popupColor()) {
         @Composable
         fun item(
           label: String,
@@ -936,7 +965,30 @@ private fun MiniPlayer(onOpen: () -> Unit) {
       delay(500)
     }
   }
-  Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
+  val miniCtx = LocalContext.current
+  val miniBase = solidSurface()
+  val miniArt by produceState<Bitmap?>(null, t.id) { value = withContext(Dispatchers.IO) { loadArt(miniCtx, t, 160) } }
+  Surface(
+    color = miniBase,
+    modifier =
+      Modifier
+        .fillMaxWidth()
+        .clickable(onClick = onOpen)
+        .pointerInput(Unit) {
+          // swipe the mini player down to close it and stop the music
+          var dy = 0f
+          detectVerticalDragGestures(
+            onDragStart = { dy = 0f },
+            onDragEnd = { if (dy > 70f) MusicController.stopAll() },
+          ) { _, d -> dy += d }
+        },
+  ) {
+    Box {
+    val ma = miniArt
+    if (ma != null) {
+      Image(bitmap = ma.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize().blur(28.dp))
+      Box(modifier = Modifier.matchParentSize().background(miniBase.copy(alpha = 0.62f)))
+    }
     Column {
       LinearProgressIndicator(
         progress = { if (t.durationMs > 0) (pos.toFloat() / t.durationMs).coerceIn(0f, 1f) else 0f },
@@ -963,6 +1015,7 @@ private fun MiniPlayer(onOpen: () -> Unit) {
         }
       }
     }
+    }
   }
 }
 
@@ -981,6 +1034,8 @@ private fun NowPlaying(
   var showSleep by remember { mutableStateOf(false) }
   var showSpeed by remember { mutableStateOf(false) }
   var menu by remember { mutableStateOf(false) }
+  var showLyrics by remember { mutableStateOf(false) }
+  var showEditor by remember { mutableStateOf(false) }
 
   LaunchedEffect(MusicController.index, MusicController.isPlaying) {
     while (true) {
@@ -1045,9 +1100,12 @@ private fun NowPlaying(
       Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onClose) { Icon(Icons.Filled.KeyboardArrowDown, "Close") }
         Text("Now playing", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        IconButton(onClick = { showLyrics = !showLyrics }) {
+          Icon(Icons.Filled.Subtitles, "Lyrics", tint = if (showLyrics) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+        }
         Box {
           IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, "More") }
-          DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+          DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = popupColor()) {
             @Composable
             fun item(
               label: String,
@@ -1055,6 +1113,8 @@ private fun NowPlaying(
             ) = DropdownMenuItem(text = { Text(label) }, onClick = { menu = false; run() })
             item("Sleep timer") { showSleep = true }
             item("Playback speed") { showSpeed = true }
+            item(if (showLyrics) "Show cover" else "Show lyrics") { showLyrics = !showLyrics }
+            item("Edit lyrics") { showEditor = true }
             item("Equalizer") { openEqualizer(context) }
             item("Add to playlist") { actions.addToPlaylist(t) }
             item("Go to album") { actions.goAlbum(t) }
@@ -1078,7 +1138,7 @@ private fun NowPlaying(
               detectHorizontalDragGestures(
                 onDragStart = { dx = 0f },
                 onDragEnd = {
-                  if (MusicSettings.swipeCover) {
+                  if (MusicSettings.swipeCover && !showLyrics) {
                     if (dx > 150f) MusicController.previous() else if (dx < -150f) MusicController.next()
                   }
                 },
@@ -1086,7 +1146,20 @@ private fun NowPlaying(
             },
         contentAlignment = Alignment.Center,
       ) {
-        TrackArt(t, 800, Modifier.fillMaxWidth(coverFraction).aspectRatio(1f), RoundedCornerShape(28.dp))
+        if (showLyrics) {
+          LyricsPanel(
+            track = t,
+            pos = pos,
+            onSeek = {
+              MusicController.seekTo(it)
+              pos = it
+            },
+            onEdit = { showEditor = true },
+            modifier = Modifier.fillMaxSize(),
+          )
+        } else {
+          TrackArt(t, 800, Modifier.fillMaxWidth(coverFraction).aspectRatio(1f), RoundedCornerShape(28.dp))
+        }
       }
       Spacer(Modifier.height(16.dp))
 
@@ -1154,8 +1227,14 @@ private fun NowPlaying(
     }
   }
 
+  if (showEditor) {
+    Dialog(onDismissRequest = { showEditor = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+      LyricsEditor(track = t, onClose = { showEditor = false })
+    }
+  }
+
   if (showQueue) {
-    ModalBottomSheet(onDismissRequest = { showQueue = false }) {
+    ModalBottomSheet(onDismissRequest = { showQueue = false }, containerColor = popupColor()) {
       Text("Playing queue  (${MusicController.queue.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
       LazyColumn(modifier = Modifier.fillMaxHeight(0.7f)) {
         itemsIndexed(MusicController.queue.toList(), key = { _, q -> q.id }) { i, q ->
@@ -1178,6 +1257,7 @@ private fun NowPlaying(
   }
   if (showSleep) {
     AlertDialog(
+      containerColor = popupColor(),
       onDismissRequest = { showSleep = false },
       title = { Text("Sleep timer") },
       text = {
@@ -1195,6 +1275,7 @@ private fun NowPlaying(
   }
   if (showSpeed) {
     AlertDialog(
+      containerColor = popupColor(),
       onDismissRequest = { showSpeed = false },
       title = { Text("Playback speed") },
       text = {
@@ -1216,7 +1297,7 @@ private fun NowPlaying(
 // ---------------------------------------------------------------------------------------------
 
 @Composable
-private fun TrackArt(
+internal fun TrackArt(
   track: MusicTrack?,
   size: Int,
   modifier: Modifier,

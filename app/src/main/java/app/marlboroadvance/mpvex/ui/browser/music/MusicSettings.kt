@@ -77,6 +77,9 @@ object MusicSettings {
   var coverShape by mutableIntStateOf(0)
   var showSongArt by mutableStateOf(true)
 
+  /** Search lyrics on the web automatically when a song has none saved. */
+  var lyricsAuto by mutableStateOf(true)
+
   fun isTabVisible(i: Int): Boolean = (tabsMask and (1 shl i)) != 0
 
   fun firstVisibleTab(): Int = (0..4).firstOrNull { isTabVisible(it) } ?: 0
@@ -125,6 +128,7 @@ object MusicSettings {
       "gridColumns" to gridColumns,
       "coverShape" to coverShape,
       "showSongArt" to showSongArt,
+      "lyricsAuto" to lyricsAuto,
     )
 
   private fun load(
@@ -158,6 +162,7 @@ object MusicSettings {
     gridColumns = i("gridColumns", gridColumns).coerceIn(2, 4)
     coverShape = i("coverShape", coverShape).coerceIn(0, 2)
     showSongArt = b("showSongArt", showSongArt)
+    lyricsAuto = b("lyricsAuto", lyricsAuto)
   }
 
   fun init(context: Context) {
@@ -215,6 +220,7 @@ object MusicSettings {
     gridColumns = 2
     coverShape = 0
     showSongArt = true
+    lyricsAuto = true
     save()
   }
 }
