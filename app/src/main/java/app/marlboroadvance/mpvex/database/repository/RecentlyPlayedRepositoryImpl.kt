@@ -19,6 +19,9 @@ class RecentlyPlayedRepositoryImpl(
     launchSource: String?,
     playlistId: Int?,
   ) {
+    // Videos hidden through Privacy must not show up in the Recents history
+    if (filePath.contains("/files/privacy/")) return
+
     // Check if there's an existing entry for this file
     val existingEntry = recentlyPlayedDao.getByFilePath(filePath)
     

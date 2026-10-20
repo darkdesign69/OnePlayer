@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -46,6 +47,7 @@ fun BrowserBottomBar(
   showRename: Boolean = true,
   showDelete: Boolean = true,
   showAddToPlaylist: Boolean = true,
+  onHideClick: (() -> Unit)? = null,
 ) {
   AnimatedVisibility(
     visible = isSelectionMode,
@@ -56,7 +58,7 @@ fun BrowserBottomBar(
     Surface(
       modifier = Modifier
         .windowInsetsPadding(WindowInsets.systemBars)
-        .padding(horizontal = 20.dp, vertical = 8.dp),
+        .padding(horizontal = 12.dp, vertical = 8.dp),
       shape = RoundedCornerShape(32.dp),
       color = MaterialTheme.colorScheme.surfaceContainerHigh,
       tonalElevation = 3.dp,
@@ -64,8 +66,25 @@ fun BrowserBottomBar(
     ) {
       Row(
         modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
       ) {
+        if (onHideClick != null) {
+          FilledTonalIconButton(
+            onClick = onHideClick,
+            modifier = Modifier.size(50.dp),
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+              containerColor = MaterialTheme.colorScheme.secondaryContainer,
+              contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ),
+          ) {
+            Icon(
+              imageVector = Icons.Filled.VisibilityOff,
+              contentDescription = "Hide in Privacy",
+              modifier = Modifier.size(24.dp),
+            )
+          }
+        }
+
         FilledTonalIconButton(
           onClick = onCopyClick,
           enabled = showCopy,

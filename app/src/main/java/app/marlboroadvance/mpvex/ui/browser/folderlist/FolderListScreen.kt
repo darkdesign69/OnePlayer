@@ -547,6 +547,12 @@ object FolderListScreen : Screen {
                 }
               }
             } else {
+              androidx.compose.foundation.layout.Column(modifier = Modifier.fillMaxSize()) {
+              LibraryChips(
+                onMusicClick = { backstack.add(app.marlboroadvance.mpvex.ui.browser.music.MusicScreen) },
+                onPrivacyClick = { backstack.add(app.marlboroadvance.mpvex.ui.browser.privacy.PrivacyScreen) },
+              )
+              Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
               FolderListContent(
                 folders = filteredFolders,
                 foldersWithNewCount = foldersWithNewCount,
@@ -575,6 +581,8 @@ object FolderListScreen : Screen {
                   selectionManager.toggle(folder)
                 },
               )
+              }
+              }
             }
           }
 
