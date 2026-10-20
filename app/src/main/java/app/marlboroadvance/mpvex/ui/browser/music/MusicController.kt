@@ -181,6 +181,8 @@ object MusicController {
   private var resumeOnFocus = false
   private var baseQueue: List<MusicTrack> = emptyList()
   private var notifArt: Bitmap? = null
+  private var restoredTrackId = -1L
+  private var restoredPosMs = 0
   private val handler = Handler(Looper.getMainLooper())
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
   var serviceRunning = false
@@ -284,6 +286,9 @@ object MusicController {
 
   private fun startCurrent() {
     val t = current ?: return
+    val seekOnStart = if (restoredTrackId == t.id) restoredPosMs else 0
+    restoredTrackId = -1L
+    restoredPosMs = 0
     releasePlayer()
     if (!requestFocus()) return
     val mp = MediaPlayer()
@@ -302,6 +307,7 @@ object MusicController {
       mp.setOnPreparedListener {
         prepared = true
         applySpeed()
+        if (seekOnStart > 0) it.seekTo(seekOnStart)
         it.start()
         isPlaying = true
         onStateChanged()
@@ -340,6 +346,11 @@ object MusicController {
   }
 
   fun resume() {
+    if (player == null) {
+      // Queue was brought back after reopening the app: start it from the saved position
+      if (current != null) startCurrent()
+      return
+    }
     val mp = player ?: return
     if (!prepared) return
     if (!requestFocus()) return
@@ -389,12 +400,22 @@ object MusicController {
     }
   }
 
-  fun position(): Int = if (prepared) (player?.currentPosition ?: 0) else 0
+  fun position(): Int =
+    when {
+      prepared -> player?.currentPosition ?: 0
+      player == null && current != null && restoredTrackId == current?.id -> restoredPosMs
+      else -> 0
+    }
 
   fun seekTo(ms: Int) {
     if (prepared) {
       player?.seekTo(ms)
       onStateChanged()
+    } else if (player == null) {
+      current?.let {
+        restoredTrackId = it.id
+        restoredPosMs = ms
+      }
     }
   }
 
@@ -417,6 +438,7 @@ object MusicController {
 
   fun cycleRepeat() {
     repeat = (repeat + 1) % 3
+    saveQueueState()
   }
 
   fun changeSpeed(value: Float) {
@@ -584,6 +606,80 @@ object MusicController {
       .apply()
   }
 
+  // ---- remember queue / backup ----
+
+  /** Saves the queue, song and position so they can be brought back next time. */
+  fun saveQueueState() {
+    if (!initialised || queue.isEmpty() || !MusicSettings.restoreQueue) return
+    app
+      .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+      .edit()
+      .putString("q_ids", queue.joinToString(",") { it.id.toString() })
+      .putInt("q_index", index)
+      .putInt("q_pos", position())
+      .putBoolean("q_shuffle", shuffle)
+      .putInt("q_repeat", repeat)
+      .putFloat("q_speed", speed)
+      .apply()
+  }
+
+  private fun clearSavedQueue() {
+    if (!initialised) return
+    app
+      .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+      .edit()
+      .remove("q_ids")
+      .remove("q_index")
+      .remove("q_pos")
+      .apply()
+  }
+
+  /** Puts the last queue back (paused) so the mini player shows where you stopped. */
+  fun restoreQueue(byId: Map<Long, MusicTrack>) {
+    if (!initialised || queue.isNotEmpty() || !MusicSettings.restoreQueue) return
+    val p = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    val ids = p.getString("q_ids", "")!!.split(",").mapNotNull { it.toLongOrNull() }
+    val list = ids.mapNotNull { byId[it] }
+    if (list.isEmpty()) return
+    val savedId = ids.getOrNull(p.getInt("q_index", 0))
+    baseQueue = list
+    queue.addAll(list)
+    index = list.indexOfFirst { it.id == savedId }.coerceAtLeast(0)
+    shuffle = p.getBoolean("q_shuffle", false)
+    repeat = p.getInt("q_repeat", 0).coerceIn(0, 2)
+    speed = p.getFloat("q_speed", 1f)
+    restoredTrackId = list[index].id
+    restoredPosMs = p.getInt("q_pos", 0)
+    isPlaying = false
+  }
+
+  fun exportJson(): JSONObject {
+    val pl = JSONObject()
+    playlists.forEach { (k, v) -> pl.put(k, JSONArray(v)) }
+    return JSONObject()
+      .put("favorites", JSONArray(favorites.toList()))
+      .put("history", JSONArray(history))
+      .put("playlists", pl)
+  }
+
+  fun importJson(o: JSONObject) {
+    o.optJSONArray("favorites")?.let { a ->
+      favorites = (0 until a.length()).map { a.getLong(it) }.toSet()
+    }
+    o.optJSONArray("history")?.let { a ->
+      history = (0 until a.length()).map { a.getLong(it) }
+    }
+    o.optJSONObject("playlists")?.let { obj ->
+      val map = linkedMapOf<String, List<Long>>()
+      for (k in obj.keys()) {
+        val arr = obj.getJSONArray(k)
+        map[k] = (0 until arr.length()).map { arr.getLong(it) }
+      }
+      playlists = map
+    }
+    savePrefs()
+  }
+
   // ---- focus / release / session / notification ----
 
   private fun requestFocus(): Boolean {
@@ -637,11 +733,13 @@ object MusicController {
     baseQueue = emptyList()
     index = -1
     isPlaying = false
+    clearSavedQueue()
     session?.isActive = false
     app.stopService(Intent(app, MusicPlaybackService::class.java))
   }
 
   private fun onStateChanged() {
+    saveQueueState()
     updateSession()
     if (current == null) return
     try {

@@ -119,6 +119,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -194,9 +195,15 @@ private val sortNames = listOf("Title", "Artist", "Album", "Date added", "Durati
 /** Retro-Music-Player style music library + now playing, running inside OnePlayer. */
 @Serializable
 object MusicScreen : Screen {
-  @OptIn(ExperimentalMaterial3Api::class)
   @Composable
   override fun Content() {
+    MusicSettings.init(LocalContext.current)
+    MusicPanelTheme { MusicScreenBody() }
+  }
+
+  @OptIn(ExperimentalMaterial3Api::class)
+  @Composable
+  private fun MusicScreenBody() {
     val context = LocalContext.current
     val backstack = LocalBackStack.current
     MusicController.init(context)
@@ -228,14 +235,34 @@ object MusicScreen : Screen {
       loading = false
     }
 
-    var tab by remember { mutableIntStateOf(MusicSettings.defaultTab) }
+    LaunchedEffect(tracks) {
+      if (tracks.isNotEmpty()) MusicController.restoreQueue(tracks.associateBy { it.id })
+    }
+    DisposableEffect(Unit) {
+      onDispose { MusicController.saveQueueState() }
+    }
+
+    var tab by remember { mutableIntStateOf(MusicSettings.startTab()) }
     var showSettings by remember { mutableStateOf(false) }
+    var settingsPage by remember { mutableIntStateOf(-1) }
+    LaunchedEffect(tab) {
+      MusicSettings.lastTab = tab
+      MusicSettings.save()
+    }
+    LaunchedEffect(MusicSettings.tabsMask) {
+      if (!MusicSettings.isTabVisible(tab)) tab = MusicSettings.firstVisibleTab()
+    }
     var detail by remember { mutableStateOf<Detail?>(null) }
     var showNow by remember { mutableStateOf(false) }
     var searching by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
-    var sortBy by remember { mutableIntStateOf(0) }
-    var sortDesc by remember { mutableStateOf(false) }
+    var sortBy by remember { mutableIntStateOf(MusicSettings.sortBy) }
+    var sortDesc by remember { mutableStateOf(MusicSettings.sortDesc) }
+    LaunchedEffect(sortBy, sortDesc) {
+      MusicSettings.sortBy = sortBy
+      MusicSettings.sortDesc = sortDesc
+      MusicSettings.save()
+    }
     var sortMenu by remember { mutableStateOf(false) }
 
     var addTarget by remember { mutableStateOf<MusicTrack?>(null) }
@@ -282,6 +309,10 @@ object MusicScreen : Screen {
       if (shuffle) MusicController.shuffleAll(list) else MusicController.play(list, i, false)
     }
 
+    fun openNow() {
+      if (MusicSettings.openNowOnPlay) showNow = true
+    }
+
     fun detailTracks(d: Detail): List<MusicTrack> =
       when (d) {
         is Detail.AlbumD -> albums.firstOrNull { it.key == d.key }?.tracks.orEmpty()
@@ -323,7 +354,9 @@ object MusicScreen : Screen {
     BackHandler(enabled = showNow || detail != null || searching || showSettings) {
       when {
         showNow -> showNow = false
-        showSettings -> showSettings = false
+        showSettings -> {
+          if (settingsPage >= 0) settingsPage = -1 else showSettings = false
+        }
         searching -> {
           searching = false
           query = ""
@@ -353,14 +386,16 @@ object MusicScreen : Screen {
                   modifier = Modifier.fillMaxWidth(),
                 )
               } else {
-                Text(text = if (showSettings) "Music settings" else (detail?.title ?: "Music"), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(text = if (showSettings) (musicSettingsTitles.getOrNull(settingsPage) ?: "Settings") else (detail?.title ?: "Music"), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
               }
             },
             navigationIcon = {
               IconButton(
                 onClick = {
                   when {
-                    showSettings -> showSettings = false
+                    showSettings -> {
+          if (settingsPage >= 0) settingsPage = -1 else showSettings = false
+        }
                     searching -> {
                       searching = false
                       query = ""
@@ -374,7 +409,7 @@ object MusicScreen : Screen {
             actions = {
               if (!searching && detail == null && !showSettings) {
                 IconButton(onClick = { searching = true }) { Icon(Icons.Filled.Search, "Search") }
-                IconButton(enabled = granted && tracks.isNotEmpty(), onClick = { startPlay(tracks, 0, true); showNow = true }) {
+                IconButton(enabled = granted && tracks.isNotEmpty(), onClick = { startPlay(tracks, 0, true); openNow() }) {
                   Icon(Icons.Filled.Shuffle, "Shuffle all")
                 }
                 if (tab == 1) {
@@ -393,7 +428,7 @@ object MusicScreen : Screen {
                     }
                   }
                 }
-                IconButton(onClick = { showSettings = true }) { Icon(Icons.Filled.Settings, "Music settings") }
+                IconButton(onClick = { settingsPage = -1; showSettings = true }) { Icon(Icons.Filled.Settings, "Music settings") }
               } else if (searching && query.isNotEmpty()) {
                 IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, "Clear") }
               }
@@ -413,17 +448,21 @@ object MusicScreen : Screen {
                   "Playlists" to Icons.AutoMirrored.Filled.QueueMusic,
                 )
               items.forEachIndexed { i, (label, icon) ->
-                NavigationBarItem(
-                  selected = tab == i && detail == null,
-                  onClick = {
-                    tab = i
-                    detail = null
-                    searching = false
-                    query = ""
-                  },
-                  icon = { Icon(icon, contentDescription = label) },
-                  label = { Text(label, maxLines = 1) },
-                )
+                if (MusicSettings.isTabVisible(i)) {
+                  val labelText: @Composable () -> Unit = { Text(label, maxLines = 1) }
+                  NavigationBarItem(
+                    selected = tab == i && detail == null,
+                    onClick = {
+                      tab = i
+                      detail = null
+                      searching = false
+                      query = ""
+                    },
+                    icon = { Icon(icon, contentDescription = label) },
+                    label = if (MusicSettings.tabLabels == 2) null else labelText,
+                    alwaysShowLabel = MusicSettings.tabLabels == 0,
+                  )
+                }
               }
             }
           }
@@ -434,7 +473,9 @@ object MusicScreen : Screen {
           val q = query.trim()
           when {
             showSettings ->
-              SettingsView(
+              MusicSettingsHost(
+                page = settingsPage,
+                onPage = { settingsPage = it },
                 onScan = { scanPhone(); showSettings = false },
                 onClearHistory = {
                   MusicController.clearHistory()
@@ -458,7 +499,7 @@ object MusicScreen : Screen {
               if (songs.isEmpty()) {
                 Text("No results", color = MaterialTheme.colorScheme.outline)
               } else {
-                SongList(songs, actions, onPlay = { i -> startPlay(songs, i); showNow = true })
+                SongList(songs, actions, onPlay = { i -> startPlay(songs, i); openNow() })
               }
             }
             d != null -> {
@@ -467,8 +508,8 @@ object MusicScreen : Screen {
                 detail = d,
                 songs = list,
                 actions = actions,
-                onPlay = { i -> startPlay(list, i); showNow = true },
-                onShuffle = { startPlay(list, 0, true); showNow = true },
+                onPlay = { i -> startPlay(list, i); openNow() },
+                onShuffle = { startPlay(list, 0, true); openNow() },
                 onRemoveFromPlaylist = if (d is Detail.ListD && d.kind == "playlist") ({ t: MusicTrack -> MusicController.removeFromPlaylist(d.title, t.id) }) else null,
                 onClearHistory = if (d is Detail.ListD && d.kind == "history") ({ MusicController.clearHistory() }) else null,
               )
@@ -478,12 +519,12 @@ object MusicScreen : Screen {
                 tracks = tracks,
                 albums = albums,
                 byId = byId,
-                onShuffle = { startPlay(tracks, 0, true); showNow = true },
+                onShuffle = { startPlay(tracks, 0, true); openNow() },
                 onOpen = { detail = it },
-                onPlayTrack = { list, i -> startPlay(list, i); showNow = true },
+                onPlayTrack = { list, i -> startPlay(list, i); openNow() },
                 onAlbum = { detail = Detail.AlbumD(it.key, it.name, it.artist) },
               )
-            tab == 1 -> SongList(sortedSongs, actions, onPlay = { i -> startPlay(sortedSongs, i); showNow = true })
+            tab == 1 -> SongList(sortedSongs, actions, onPlay = { i -> startPlay(sortedSongs, i); openNow() })
             tab == 2 ->
               LazyVerticalGrid(
                 columns = GridCells.Fixed(MusicSettings.gridColumns.coerceIn(2, 4)),
@@ -633,13 +674,15 @@ private fun HomeTab(
         }
       }
     }
-    if (played.isNotEmpty()) {
+    if (played.isNotEmpty() && MusicSettings.homeRecent) {
       item { SectionTitle("Recently played", null) }
       item { TrackRow(played) { i -> onPlayTrack(played, i) } }
     }
-    item { SectionTitle("Last added", "See all") { onOpen(Detail.ListD("Last added", "recent")) } }
-    item { TrackRow(recent) { i -> onPlayTrack(recent, i) } }
-    if (randomAlbums.isNotEmpty()) {
+    if (MusicSettings.homeLastAdded) {
+      item { SectionTitle("Last added", "See all") { onOpen(Detail.ListD("Last added", "recent")) } }
+      item { TrackRow(recent) { i -> onPlayTrack(recent, i) } }
+    }
+    if (randomAlbums.isNotEmpty() && MusicSettings.homeAlbums) {
       item { SectionTitle("Albums", null) }
       item {
         LazyRow(contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -846,11 +889,11 @@ private fun SongRow(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(14.dp),
   ) {
-    TrackArt(track, 140, Modifier.size(48.dp), RoundedCornerShape(12.dp))
+    if (MusicSettings.showSongArt) TrackArt(track, 140, Modifier.size(48.dp), RoundedCornerShape(12.dp))
     Column(modifier = Modifier.weight(1f)) {
       Text(track.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
       Text(
-        "${track.artist}  •  ${formatTrackTime(track.durationMs)}",
+        if (MusicSettings.showSongDuration) "${track.artist}  •  ${formatTrackTime(track.durationMs)}" else track.artist,
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.outline,
         maxLines = 1,
@@ -909,10 +952,15 @@ private fun MiniPlayer(onOpen: () -> Unit) {
           Text(t.title, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
           Text(t.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+        if (MusicSettings.miniControls == 2) {
+          IconButton(onClick = { MusicController.previous() }) { Icon(Icons.Filled.SkipPrevious, "Previous") }
+        }
         IconButton(onClick = { MusicController.togglePlay() }) {
           Icon(if (MusicController.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, "Play/Pause")
         }
-        IconButton(onClick = { MusicController.next() }) { Icon(Icons.Filled.SkipNext, "Next") }
+        if (MusicSettings.miniControls != 1) {
+          IconButton(onClick = { MusicController.next() }) { Icon(Icons.Filled.SkipNext, "Next") }
+        }
       }
     }
   }
@@ -955,15 +1003,36 @@ private fun NowPlaying(
   }
   val fav = t.id in MusicController.favorites
   val duration = t.durationMs.coerceAtLeast(1L).toFloat()
+  val baseColor = solidSurface()
+  val blurBmp by produceState<Bitmap?>(null, t.id, MusicSettings.nowPlayingBg) {
+    value = if (MusicSettings.nowPlayingBg == 2) withContext(Dispatchers.IO) { loadArt(context, t, 256) } else null
+  }
+  val coverFraction =
+    when (MusicSettings.coverSize) {
+      1 -> 0.82f
+      2 -> 0.65f
+      else -> 1f
+    }
 
-  Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+  Surface(modifier = Modifier.fillMaxSize(), color = baseColor) {
+    val artBg = blurBmp
+    Box(modifier = Modifier.fillMaxSize()) {
+    if (MusicSettings.nowPlayingBg == 2 && artBg != null) {
+      Image(
+        bitmap = artBg.asImageBitmap(),
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier.fillMaxSize().blur((MusicSettings.blurAmount.coerceIn(5, 100) / 2).dp),
+      )
+      Box(modifier = Modifier.fillMaxSize().background(baseColor.copy(alpha = 0.55f)))
+    }
     Column(
       modifier =
         Modifier
           .fillMaxSize()
           .then(
             if (MusicSettings.nowPlayingBg == 0) {
-              Modifier.background(Brush.verticalGradient(listOf(animAccent.copy(alpha = 0.6f), MaterialTheme.colorScheme.surface)))
+              Modifier.background(Brush.verticalGradient(listOf(animAccent.copy(alpha = 0.6f), baseColor)))
             } else {
               Modifier
             },
@@ -1017,7 +1086,7 @@ private fun NowPlaying(
             },
         contentAlignment = Alignment.Center,
       ) {
-        TrackArt(t, 800, Modifier.fillMaxWidth().aspectRatio(1f), RoundedCornerShape(28.dp))
+        TrackArt(t, 800, Modifier.fillMaxWidth(coverFraction).aspectRatio(1f), RoundedCornerShape(28.dp))
       }
       Spacer(Modifier.height(16.dp))
 
@@ -1026,7 +1095,7 @@ private fun NowPlaying(
           Text(t.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
           Text(t.artist, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        IconButton(onClick = { MusicController.toggleFavorite(t.id) }) {
+        if (MusicSettings.showFavButton) IconButton(onClick = { MusicController.toggleFavorite(t.id) }) {
           Icon(
             if (fav) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
             "Favorite",
@@ -1070,7 +1139,7 @@ private fun NowPlaying(
         }
       }
 
-      Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+      if (MusicSettings.showExtraControls) Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
         IconButton(onClick = { showQueue = true }) { Icon(Icons.AutoMirrored.Filled.QueueMusic, "Queue") }
         IconButton(onClick = { showSleep = true }) {
           Icon(Icons.Filled.Timer, "Sleep timer", tint = if (MusicController.sleepEndAt > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
@@ -1081,6 +1150,7 @@ private fun NowPlaying(
         IconButton(onClick = { openEqualizer(context) }) { Icon(Icons.Filled.Equalizer, "Equalizer") }
         IconButton(onClick = { actions.info(t) }) { Icon(Icons.Filled.Info, "Details") }
       }
+    }
     }
   }
 
@@ -1205,7 +1275,7 @@ private fun shareTrack(
   context.startActivity(Intent.createChooser(i, "Share").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 }
 
-private fun openEqualizer(context: Context) {
+internal fun openEqualizer(context: Context) {
   try {
     val i =
       Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL)
@@ -1223,119 +1293,4 @@ private fun formatTrackTime(durationMs: Long): String {
   val minutes = totalSeconds % 3600 / 60
   val seconds = totalSeconds % 60
   return if (hours > 0) "%d:%02d:%02d".format(hours, minutes, seconds) else "%d:%02d".format(minutes, seconds)
-}
-
-// ---------------------------------------------------------------------------------------------
-// Settings
-// ---------------------------------------------------------------------------------------------
-
-@Composable
-private fun SettingsView(
-  onScan: () -> Unit,
-  onClearHistory: () -> Unit,
-) {
-  fun save(block: () -> Unit) {
-    block()
-    MusicSettings.save()
-  }
-  LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp)) {
-    item { SettingsHeader("Library") }
-    item {
-      ChoiceRow("Hide songs shorter than", listOf("Off", "10 sec", "30 sec", "60 sec"), listOf(0, 10, 30, 60).indexOf(MusicSettings.minDurationSec)) {
-        save { MusicSettings.minDurationSec = listOf(0, 10, 30, 60)[it] }
-      }
-    }
-    item {
-      ChoiceRow("Open on tab", listOf("For you", "Songs", "Albums", "Artists", "Playlists"), MusicSettings.defaultTab) {
-        save { MusicSettings.defaultTab = it }
-      }
-    }
-    item { ActionRow("Scan phone for new music", onScan) }
-    item { ActionRow("Clear history", onClearHistory) }
-
-    item { SettingsHeader("Appearance") }
-    item {
-      ChoiceRow("Album grid columns", listOf("2", "3", "4"), MusicSettings.gridColumns - 2) {
-        save { MusicSettings.gridColumns = it + 2 }
-      }
-    }
-    item {
-      ChoiceRow("Cover shape", listOf("Rounded", "Circle", "Square"), MusicSettings.coverShape) {
-        save { MusicSettings.coverShape = it }
-      }
-    }
-    item {
-      ChoiceRow("Now playing background", listOf("Album color", "Plain"), MusicSettings.nowPlayingBg) {
-        save { MusicSettings.nowPlayingBg = it }
-      }
-    }
-
-    item { SettingsHeader("Playback") }
-    item {
-      SwitchRow("Keep screen on in Now playing", MusicSettings.keepScreenOn) { save { MusicSettings.keepScreenOn = it } }
-    }
-    item {
-      SwitchRow("Pause when headphones disconnect", MusicSettings.pauseOnUnplug) { save { MusicSettings.pauseOnUnplug = it } }
-    }
-    item {
-      SwitchRow("Swipe cover to change song", MusicSettings.swipeCover) { save { MusicSettings.swipeCover = it } }
-    }
-    item { ActionRow("Reset all settings") { MusicSettings.reset() } }
-  }
-}
-
-@Composable
-private fun SettingsHeader(text: String) {
-  Text(
-    text,
-    style = MaterialTheme.typography.titleSmall,
-    color = MaterialTheme.colorScheme.primary,
-    fontWeight = FontWeight.Bold,
-    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp),
-  )
-}
-
-@Composable
-private fun ChoiceRow(
-  title: String,
-  options: List<String>,
-  selected: Int,
-  onSelect: (Int) -> Unit,
-) {
-  Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-    Text(title, style = MaterialTheme.typography.bodyLarge)
-    Spacer(Modifier.height(6.dp))
-    Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      options.forEachIndexed { i, label ->
-        FilterChip(selected = i == selected, onClick = { onSelect(i) }, label = { Text(label) })
-      }
-    }
-  }
-}
-
-@Composable
-private fun SwitchRow(
-  title: String,
-  checked: Boolean,
-  onChange: (Boolean) -> Unit,
-) {
-  Row(
-    modifier = Modifier.fillMaxWidth().clickable { onChange(!checked) }.padding(horizontal = 16.dp, vertical = 10.dp),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-    Switch(checked = checked, onCheckedChange = onChange)
-  }
-}
-
-@Composable
-private fun ActionRow(
-  title: String,
-  onClick: () -> Unit,
-) {
-  Text(
-    title,
-    style = MaterialTheme.typography.bodyLarge,
-    modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 14.dp),
-  )
 }
