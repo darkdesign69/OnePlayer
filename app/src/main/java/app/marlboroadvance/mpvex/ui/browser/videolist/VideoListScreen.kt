@@ -250,6 +250,59 @@ data class VideoListScreen(
       selectionManager.clear()
     }
 
+    // Hide selected videos in Privacy
+    val hideConfirmOpen = rememberSaveable { mutableStateOf(false) }
+    val createPinOpen = rememberSaveable { mutableStateOf(false) }
+
+    if (createPinOpen.value) {
+      app.marlboroadvance.mpvex.ui.browser.privacy.CreatePinDialog(
+        onDismiss = { createPinOpen.value = false },
+        onPinCreated = { pin ->
+          val salt = app.marlboroadvance.mpvex.ui.browser.privacy.newPrivacySalt()
+          browserPreferences.privacyPinSalt.set(salt)
+          browserPreferences.privacyPinHash.set(
+            app.marlboroadvance.mpvex.ui.browser.privacy.hashPrivacyPin(salt, pin),
+          )
+          createPinOpen.value = false
+          hideConfirmOpen.value = true
+        },
+      )
+    }
+
+    if (hideConfirmOpen.value) {
+      androidx.compose.material3.AlertDialog(
+        onDismissRequest = { hideConfirmOpen.value = false },
+        title = { Text("Hide in Privacy?") },
+        text = {
+          Text(
+            "The selected videos move into Privacy. They disappear from your folders, the gallery and other apps, and can only be played from the Privacy chip after you enter your PIN. If you uninstall the app or clear its data, hidden videos are lost.",
+          )
+        },
+        confirmButton = {
+          androidx.compose.material3.TextButton(
+            onClick = {
+              hideConfirmOpen.value = false
+              val paths = selectionManager.getSelectedItems().map { it.path }
+              coroutineScope.launch {
+                val count = app.marlboroadvance.mpvex.ui.browser.privacy.PrivacyStore.hide(context, paths)
+                selectionManager.clear()
+                viewModel.refresh()
+                android.widget.Toast
+                  .makeText(
+                    context,
+                    if (count > 0) "Hidden in Privacy: $count" else "Couldn't hide the videos",
+                    android.widget.Toast.LENGTH_SHORT,
+                  ).show()
+              }
+            },
+          ) { Text("Hide") }
+        },
+        dismissButton = {
+          androidx.compose.material3.TextButton(onClick = { hideConfirmOpen.value = false }) { Text("Cancel") }
+        },
+      )
+    }
+
     // Listen for lifecycle resume events to refresh playback progress when returning from player
     DisposableEffect(lifecycleOwner) {
       var isFirstResume = true
@@ -414,6 +467,13 @@ data class VideoListScreen(
             onRenameClick = { renameDialogOpen.value = true },
             onDeleteClick = { deleteDialogOpen.value = true },
             onAddToPlaylistClick = { addToPlaylistDialogOpen.value = true },
+            onHideClick = {
+              if (browserPreferences.privacyPinHash.get().isEmpty()) {
+                createPinOpen.value = true
+              } else {
+                hideConfirmOpen.value = true
+              }
+            },
             showRename = selectionManager.isSingleSelection
           )
         }

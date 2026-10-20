@@ -20,6 +20,10 @@ class BrowserPreferences(
 
   val folderViewMode = preferenceStore.getEnum("folder_view_mode", FolderViewMode.AlbumView)
 
+  // Privacy: PIN that protects the hidden videos
+  val privacyPinHash = preferenceStore.getString("privacy_pin_hash", "")
+  val privacyPinSalt = preferenceStore.getString("privacy_pin_salt", "")
+
   private val isTablet = context.resources.configuration.smallestScreenWidthDp >= 600
   val folderGridColumnsPortrait = preferenceStore.getInt("folder_grid_columns_portrait", if (isTablet) 4 else 3)
   val folderGridColumnsLandscape = preferenceStore.getInt("folder_grid_columns_landscape", 5)

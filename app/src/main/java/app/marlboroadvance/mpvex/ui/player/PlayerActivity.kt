@@ -1718,8 +1718,11 @@ class PlayerActivity :
       mediaIdentifier = getMediaIdentifier(intent, fileName)
     }
 
-    // Start media notification service (like YouTube - always show notification)
-    startBackgroundPlayback()
+    // The media notification is only started when automatic background playback is turned on,
+    // or when the user taps the background playback button
+    if (audioPreferences.automaticBackgroundPlayback.get()) {
+      startBackgroundPlayback()
+    }
 
     // Reset AB loop values when video changes
     viewModel.clearABLoop()
@@ -2859,6 +2862,9 @@ class PlayerActivity :
     
     // Set flag to enable background playback (same logic as automatic)
     isManualBackgroundPlayback = true
+
+    // Start the notification service now, since it is no longer started for every video
+    startBackgroundPlayback()
     
     // Restore system UI before going to background
     restoreSystemUI()
