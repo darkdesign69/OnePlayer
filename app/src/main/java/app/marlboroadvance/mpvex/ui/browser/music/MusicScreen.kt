@@ -1098,7 +1098,7 @@ private fun NowPlaying(
       text = {
         Column {
           listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).forEach { s ->
-            TextButton(onClick = { MusicController.setSpeed(s); showSpeed = false }) {
+            TextButton(onClick = { MusicController.changeSpeed(s); showSpeed = false }) {
               Text("${s}x" + if (s == MusicController.speed) "  ✓" else "")
             }
           }

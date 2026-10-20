@@ -419,7 +419,7 @@ object MusicController {
     repeat = (repeat + 1) % 3
   }
 
-  fun setSpeed(value: Float) {
+  fun changeSpeed(value: Float) {
     speed = value
     applySpeed()
     onStateChanged()
