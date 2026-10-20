@@ -126,7 +126,7 @@ fun loadMusicTracks(context: Context): List<MusicTrack> {
       .query(
         collection,
         projection,
-        "${MediaStore.Audio.Media.DURATION} >= 10000 AND ${MediaStore.Audio.Media.IS_RINGTONE} = 0 AND ${MediaStore.Audio.Media.IS_NOTIFICATION} = 0 AND ${MediaStore.Audio.Media.IS_ALARM} = 0",
+        "${MediaStore.Audio.Media.DURATION} >= ${MusicSettings.minDurationSec * 1000} AND ${MediaStore.Audio.Media.IS_RINGTONE} = 0 AND ${MediaStore.Audio.Media.IS_NOTIFICATION} = 0 AND ${MediaStore.Audio.Media.IS_ALARM} = 0",
         null,
         "${MediaStore.Audio.Media.TITLE} COLLATE NOCASE ASC",
       )?.use { c ->
@@ -207,7 +207,7 @@ object MusicController {
         context: Context?,
         intent: Intent?,
       ) {
-        if (isPlaying) pause()
+        if (isPlaying && MusicSettings.pauseOnUnplug) pause()
       }
     }
 

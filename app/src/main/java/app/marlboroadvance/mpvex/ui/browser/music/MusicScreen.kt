@@ -45,6 +45,14 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Switch
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -192,6 +200,7 @@ object MusicScreen : Screen {
     val context = LocalContext.current
     val backstack = LocalBackStack.current
     MusicController.init(context)
+    MusicSettings.init(context)
 
     val permission =
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -211,7 +220,7 @@ object MusicScreen : Screen {
     var reloadKey by remember { mutableIntStateOf(0) }
     var scanning by remember { mutableStateOf(false) }
 
-    LaunchedEffect(granted, reloadKey) {
+    LaunchedEffect(granted, reloadKey, MusicSettings.minDurationSec) {
       if (granted) {
         loading = true
         tracks = withContext(Dispatchers.IO) { loadMusicTracks(context) }
@@ -219,7 +228,8 @@ object MusicScreen : Screen {
       loading = false
     }
 
-    var tab by remember { mutableIntStateOf(0) }
+    var tab by remember { mutableIntStateOf(MusicSettings.defaultTab) }
+    var showSettings by remember { mutableStateOf(false) }
     var detail by remember { mutableStateOf<Detail?>(null) }
     var showNow by remember { mutableStateOf(false) }
     var searching by remember { mutableStateOf(false) }
@@ -249,6 +259,15 @@ object MusicScreen : Screen {
         val s = tracks.sortedWith(cmp)
         if (sortDesc) s.reversed() else s
       }
+
+    fun scanPhone() {
+      scanning = true
+      val root = android.os.Environment.getExternalStorageDirectory().absolutePath
+      MediaScannerConnection.scanFile(context, arrayOf(root), null) { _, _ ->
+        reloadKey += 1
+        scanning = false
+      }
+    }
 
     fun startPlay(
       list: List<MusicTrack>,
@@ -301,9 +320,10 @@ object MusicScreen : Screen {
         info = { infoTarget = it },
       )
 
-    BackHandler(enabled = showNow || detail != null || searching) {
+    BackHandler(enabled = showNow || detail != null || searching || showSettings) {
       when {
         showNow -> showNow = false
+        showSettings -> showSettings = false
         searching -> {
           searching = false
           query = ""
@@ -333,13 +353,14 @@ object MusicScreen : Screen {
                   modifier = Modifier.fillMaxWidth(),
                 )
               } else {
-                Text(text = detail?.title ?: "Music", fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(text = if (showSettings) "Music settings" else (detail?.title ?: "Music"), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
               }
             },
             navigationIcon = {
               IconButton(
                 onClick = {
                   when {
+                    showSettings -> showSettings = false
                     searching -> {
                       searching = false
                       query = ""
@@ -351,7 +372,7 @@ object MusicScreen : Screen {
               ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
             },
             actions = {
-              if (!searching && detail == null) {
+              if (!searching && detail == null && !showSettings) {
                 IconButton(onClick = { searching = true }) { Icon(Icons.Filled.Search, "Search") }
                 IconButton(enabled = granted && tracks.isNotEmpty(), onClick = { startPlay(tracks, 0, true); showNow = true }) {
                   Icon(Icons.Filled.Shuffle, "Shuffle all")
@@ -372,17 +393,7 @@ object MusicScreen : Screen {
                     }
                   }
                 }
-                IconButton(
-                  enabled = granted && !scanning,
-                  onClick = {
-                    scanning = true
-                    val root = android.os.Environment.getExternalStorageDirectory().absolutePath
-                    MediaScannerConnection.scanFile(context, arrayOf(root), null) { _, _ ->
-                      reloadKey += 1
-                      scanning = false
-                    }
-                  },
-                ) { Icon(Icons.Filled.Refresh, "Scan phone for music") }
+                IconButton(onClick = { showSettings = true }) { Icon(Icons.Filled.Settings, "Music settings") }
               } else if (searching && query.isNotEmpty()) {
                 IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, "Clear") }
               }
@@ -422,6 +433,14 @@ object MusicScreen : Screen {
           val d = detail
           val q = query.trim()
           when {
+            showSettings ->
+              SettingsView(
+                onScan = { scanPhone(); showSettings = false },
+                onClearHistory = {
+                  MusicController.clearHistory()
+                  Toast.makeText(context, "History cleared", Toast.LENGTH_SHORT).show()
+                },
+              )
             !granted ->
               Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -467,7 +486,7 @@ object MusicScreen : Screen {
             tab == 1 -> SongList(sortedSongs, actions, onPlay = { i -> startPlay(sortedSongs, i); showNow = true })
             tab == 2 ->
               LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
+                columns = GridCells.Fixed(MusicSettings.gridColumns.coerceIn(2, 4)),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -929,6 +948,11 @@ private fun NowPlaying(
       }
   }
   val animAccent by animateColorAsState(accent, label = "accent")
+  val view = LocalView.current
+  DisposableEffect(MusicSettings.keepScreenOn) {
+    view.keepScreenOn = MusicSettings.keepScreenOn
+    onDispose { view.keepScreenOn = false }
+  }
   val fav = t.id in MusicController.favorites
   val duration = t.durationMs.coerceAtLeast(1L).toFloat()
 
@@ -937,7 +961,13 @@ private fun NowPlaying(
       modifier =
         Modifier
           .fillMaxSize()
-          .background(Brush.verticalGradient(listOf(animAccent.copy(alpha = 0.6f), MaterialTheme.colorScheme.surface)))
+          .then(
+            if (MusicSettings.nowPlayingBg == 0) {
+              Modifier.background(Brush.verticalGradient(listOf(animAccent.copy(alpha = 0.6f), MaterialTheme.colorScheme.surface)))
+            } else {
+              Modifier
+            },
+          )
           .statusBarsPadding()
           .navigationBarsPadding()
           .padding(horizontal = 24.dp),
@@ -979,7 +1009,9 @@ private fun NowPlaying(
               detectHorizontalDragGestures(
                 onDragStart = { dx = 0f },
                 onDragEnd = {
-                  if (dx > 150f) MusicController.previous() else if (dx < -150f) MusicController.next()
+                  if (MusicSettings.swipeCover) {
+                    if (dx > 150f) MusicController.previous() else if (dx < -150f) MusicController.next()
+                  }
                 },
               ) { _, delta -> dx += delta }
             },
@@ -1121,11 +1153,21 @@ private fun TrackArt(
   shape: Shape,
 ) {
   val context = LocalContext.current
+  val finalShape: Shape =
+    if (shape is RoundedCornerShape) {
+      when (MusicSettings.coverShape) {
+        1 -> CircleShape
+        2 -> RectangleShape
+        else -> shape
+      }
+    } else {
+      shape
+    }
   val bmp by produceState<Bitmap?>(null, track?.id, size) {
     value = if (track == null) null else withContext(Dispatchers.IO) { loadArt(context, track, size) }
   }
   Box(
-    modifier = modifier.clip(shape).background(MaterialTheme.colorScheme.secondaryContainer),
+    modifier = modifier.clip(finalShape).background(MaterialTheme.colorScheme.secondaryContainer),
     contentAlignment = Alignment.Center,
   ) {
     val b = bmp
@@ -1181,4 +1223,119 @@ private fun formatTrackTime(durationMs: Long): String {
   val minutes = totalSeconds % 3600 / 60
   val seconds = totalSeconds % 60
   return if (hours > 0) "%d:%02d:%02d".format(hours, minutes, seconds) else "%d:%02d".format(minutes, seconds)
+}
+
+// ---------------------------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------------------------
+
+@Composable
+private fun SettingsView(
+  onScan: () -> Unit,
+  onClearHistory: () -> Unit,
+) {
+  fun save(block: () -> Unit) {
+    block()
+    MusicSettings.save()
+  }
+  LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp)) {
+    item { SettingsHeader("Library") }
+    item {
+      ChoiceRow("Hide songs shorter than", listOf("Off", "10 sec", "30 sec", "60 sec"), listOf(0, 10, 30, 60).indexOf(MusicSettings.minDurationSec)) {
+        save { MusicSettings.minDurationSec = listOf(0, 10, 30, 60)[it] }
+      }
+    }
+    item {
+      ChoiceRow("Open on tab", listOf("For you", "Songs", "Albums", "Artists", "Playlists"), MusicSettings.defaultTab) {
+        save { MusicSettings.defaultTab = it }
+      }
+    }
+    item { ActionRow("Scan phone for new music", onScan) }
+    item { ActionRow("Clear history", onClearHistory) }
+
+    item { SettingsHeader("Appearance") }
+    item {
+      ChoiceRow("Album grid columns", listOf("2", "3", "4"), MusicSettings.gridColumns - 2) {
+        save { MusicSettings.gridColumns = it + 2 }
+      }
+    }
+    item {
+      ChoiceRow("Cover shape", listOf("Rounded", "Circle", "Square"), MusicSettings.coverShape) {
+        save { MusicSettings.coverShape = it }
+      }
+    }
+    item {
+      ChoiceRow("Now playing background", listOf("Album color", "Plain"), MusicSettings.nowPlayingBg) {
+        save { MusicSettings.nowPlayingBg = it }
+      }
+    }
+
+    item { SettingsHeader("Playback") }
+    item {
+      SwitchRow("Keep screen on in Now playing", MusicSettings.keepScreenOn) { save { MusicSettings.keepScreenOn = it } }
+    }
+    item {
+      SwitchRow("Pause when headphones disconnect", MusicSettings.pauseOnUnplug) { save { MusicSettings.pauseOnUnplug = it } }
+    }
+    item {
+      SwitchRow("Swipe cover to change song", MusicSettings.swipeCover) { save { MusicSettings.swipeCover = it } }
+    }
+    item { ActionRow("Reset all settings") { MusicSettings.reset() } }
+  }
+}
+
+@Composable
+private fun SettingsHeader(text: String) {
+  Text(
+    text,
+    style = MaterialTheme.typography.titleSmall,
+    color = MaterialTheme.colorScheme.primary,
+    fontWeight = FontWeight.Bold,
+    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp),
+  )
+}
+
+@Composable
+private fun ChoiceRow(
+  title: String,
+  options: List<String>,
+  selected: Int,
+  onSelect: (Int) -> Unit,
+) {
+  Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+    Text(title, style = MaterialTheme.typography.bodyLarge)
+    Spacer(Modifier.height(6.dp))
+    Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      options.forEachIndexed { i, label ->
+        FilterChip(selected = i == selected, onClick = { onSelect(i) }, label = { Text(label) })
+      }
+    }
+  }
+}
+
+@Composable
+private fun SwitchRow(
+  title: String,
+  checked: Boolean,
+  onChange: (Boolean) -> Unit,
+) {
+  Row(
+    modifier = Modifier.fillMaxWidth().clickable { onChange(!checked) }.padding(horizontal = 16.dp, vertical = 10.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+    Switch(checked = checked, onCheckedChange = onChange)
+  }
+}
+
+@Composable
+private fun ActionRow(
+  title: String,
+  onClick: () -> Unit,
+) {
+  Text(
+    title,
+    style = MaterialTheme.typography.bodyLarge,
+    modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 14.dp),
+  )
 }
