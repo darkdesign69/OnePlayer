@@ -267,7 +267,7 @@ internal fun LyricsPanel(
                 .then(if (data.synced) Modifier.clickable { onSeek(l.timeMs.toInt()) } else Modifier),
             textAlign = TextAlign.Center,
             style = if (data.synced && i == current) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
-            fontWeight = if (data.synced && i == current) FontWeight.Bold else FontWeight.Normal,
+            fontWeight = if (data.synced && i == current) FontWeight.Bold else MusicFont.normal,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (active) 1f else 0.45f),
           )
         }

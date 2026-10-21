@@ -94,6 +94,18 @@ object MusicSettings {
   var highlightIdx by mutableIntStateOf(0)
   var highlightAlpha by mutableIntStateOf(20)
 
+  // ---- Font ----
+
+  /** 0 = system font, 1 Anime Ace, 2 Source Code Pro, 3 Super Waffles, 4 Stay With Me, 5 = custom file */
+  var fontChoice by mutableIntStateOf(0)
+  var customFontName by mutableStateOf("")
+  var customFontPath by mutableStateOf("")
+
+  /** Text size in percent (70-160). */
+  var fontScale by mutableIntStateOf(100)
+  var fontBold by mutableStateOf(false)
+  var fontItalic by mutableStateOf(false)
+
   // ---- Now playing extras ----
   var songInfo by mutableStateOf(true)
   var remainingTime by mutableStateOf(false)
@@ -185,6 +197,12 @@ object MusicSettings {
       "accentIdx" to accentIdx,
       "highlightIdx" to highlightIdx,
       "highlightAlpha" to highlightAlpha,
+      "fontChoice" to fontChoice,
+      "customFontName" to customFontName,
+      "customFontPath" to customFontPath,
+      "fontScale" to fontScale,
+      "fontBold" to fontBold,
+      "fontItalic" to fontItalic,
       "songInfo" to songInfo,
       "remainingTime" to remainingTime,
       "volumeSlider" to volumeSlider,
@@ -244,6 +262,12 @@ object MusicSettings {
     accentIdx = i("accentIdx", accentIdx).coerceIn(0, 20)
     highlightIdx = i("highlightIdx", highlightIdx).coerceIn(0, 20)
     highlightAlpha = i("highlightAlpha", highlightAlpha).coerceIn(0, 100)
+    fontChoice = i("fontChoice", fontChoice).coerceIn(0, 5)
+    customFontName = str("customFontName", customFontName)
+    customFontPath = str("customFontPath", customFontPath)
+    fontScale = i("fontScale", fontScale).coerceIn(70, 160)
+    fontBold = b("fontBold", fontBold)
+    fontItalic = b("fontItalic", fontItalic)
     songInfo = b("songInfo", songInfo)
     remainingTime = b("remainingTime", remainingTime)
     volumeSlider = b("volumeSlider", volumeSlider)
@@ -327,6 +351,10 @@ object MusicSettings {
     accentIdx = 0
     highlightIdx = 0
     highlightAlpha = 20
+    fontChoice = 0
+    fontScale = 100
+    fontBold = false
+    fontItalic = false
     songInfo = true
     remainingTime = false
     volumeSlider = false

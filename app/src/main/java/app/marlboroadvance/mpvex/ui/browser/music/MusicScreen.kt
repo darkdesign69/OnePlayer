@@ -68,6 +68,7 @@ import androidx.compose.material.icons.filled.AddToQueue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.foundation.layout.heightIn
@@ -604,7 +605,7 @@ object MusicScreen : Screen {
                   Column(modifier = Modifier.clickable { detail = Detail.AlbumD(a.key, a.name, a.artist) }) {
                     TrackArt(a.tracks.first(), 400, Modifier.fillMaxWidth().aspectRatio(1f), RoundedCornerShape(18.dp))
                     Spacer(Modifier.height(6.dp))
-                    Text(a.name, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(a.name, fontWeight = MusicFont.medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(a.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis)
                   }
                 }
@@ -619,7 +620,7 @@ object MusicScreen : Screen {
                   ) {
                     TrackArt(a.tracks.first(), 160, Modifier.size(52.dp), CircleShape)
                     Column {
-                      Text(a.name, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                      Text(a.name, fontWeight = MusicFont.medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                       Text("${a.albums} albums  •  ${a.tracks.size} songs", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                     }
                   }
@@ -809,7 +810,7 @@ private fun HomeTab(
             Column(modifier = Modifier.width(140.dp).clickable { onAlbum(a) }) {
               TrackArt(a.tracks.first(), 300, Modifier.size(140.dp), RoundedCornerShape(18.dp))
               Spacer(Modifier.height(6.dp))
-              Text(a.name, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+              Text(a.name, fontWeight = MusicFont.medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
               Text(a.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
           }
@@ -844,7 +845,7 @@ private fun TrackRow(
       Column(modifier = Modifier.width(140.dp).clickable { onClick(i) }) {
         TrackArt(t, 300, Modifier.size(140.dp), RoundedCornerShape(18.dp))
         Spacer(Modifier.height(6.dp))
-        Text(t.title, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(t.title, fontWeight = MusicFont.medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(t.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis)
       }
     }
@@ -924,7 +925,7 @@ private fun PlaylistRow(
       contentAlignment = Alignment.Center,
     ) { Icon(icon, null, tint = MaterialTheme.colorScheme.onSecondaryContainer) }
     Column {
-      Text(title, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+      Text(title, fontWeight = MusicFont.medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
       Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
     }
   }
@@ -1002,7 +1003,16 @@ private fun SongRow(
 ) {
   var menu by remember { mutableStateOf(false) }
   val isCurrent = MusicController.current?.id == track.id
-  val color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+  val rowHighlight = accentPalette.getOrNull(MusicSettings.highlightIdx - 1) ?: MaterialTheme.colorScheme.primary
+  val rowShade = lerp(solidSurface(), rowHighlight.copy(alpha = 1f), MusicSettings.highlightAlpha / 100f)
+  // On the highlighted row the text is black or white, whichever reads better on the highlight colour
+  val color =
+    if (isCurrent) {
+      if (rowShade.luminance() > 0.5f) Color(0xFF121212) else Color.White
+    } else {
+      MaterialTheme.colorScheme.onSurface
+    }
+  val subColor = if (isCurrent) color.copy(alpha = 0.75f) else MaterialTheme.colorScheme.outline
   Row(
     modifier =
       Modifier
@@ -1020,11 +1030,11 @@ private fun SongRow(
   ) {
     if (MusicSettings.showSongArt) TrackArt(track, 140, Modifier.size(48.dp), RoundedCornerShape(12.dp))
     Column(modifier = Modifier.weight(1f)) {
-      Text(track.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+      Text(track.title, style = MaterialTheme.typography.bodyLarge, fontWeight = MusicFont.medium, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
       Text(
         if (MusicSettings.showSongDuration) "${track.artist}  •  ${formatTrackTime(track.durationMs)}" else track.artist,
         style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.outline,
+        color = subColor,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
@@ -1112,7 +1122,7 @@ private fun MiniPlayer(onOpen: () -> Unit) {
       ) {
         TrackArt(t, 140, Modifier.size(44.dp), RoundedCornerShape(10.dp))
         Column(modifier = Modifier.weight(1f)) {
-          Text(t.title, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+          Text(t.title, fontWeight = MusicFont.medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
           Text(t.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (MusicSettings.miniControls == 2) {
@@ -1186,7 +1196,21 @@ private fun NowPlaying(
       else -> 1f
     }
 
-  Surface(modifier = Modifier.fillMaxSize(), color = baseColor) {
+  val npCs = MaterialTheme.colorScheme
+  val npApprox =
+    when (MusicSettings.nowPlayingBg) {
+      1 -> animAccent.copy(alpha = 0.75f).compositeOver(baseColor)
+      2 -> lerp(animAccent.copy(alpha = 0.6f).compositeOver(baseColor), baseColor, 0.5f)
+      3 -> animAccent.copy(alpha = 0.45f).compositeOver(baseColor)
+      4 -> lerp(animAccent.copy(alpha = 0.6f).compositeOver(baseColor), baseColor, 0.5f)
+      5 -> animAccent.copy(alpha = 0.3f).compositeOver(baseColor)
+      6 -> lerp(baseColor, npCs.primary, 0.25f)
+      else -> baseColor
+    }
+  val npOn = if (npApprox.luminance() > 0.5f) Color(0xFF121212) else Color.White
+  val npScheme = npCs.copy(onSurface = npOn, onSurfaceVariant = npOn.copy(alpha = 0.78f), outline = npOn.copy(alpha = 0.65f))
+  MaterialTheme(colorScheme = npScheme) {
+  Surface(modifier = Modifier.fillMaxSize(), color = baseColor, contentColor = npOn) {
     val artBg = blurBmp
     Box(modifier = Modifier.fillMaxSize()) {
     if (useBlur && artBg != null) {
@@ -1260,7 +1284,7 @@ private fun NowPlaying(
       }
       Spacer(Modifier.height(20.dp))
 
-      Text(t.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+      Text(t.title, style = MaterialTheme.typography.headlineSmall, fontWeight = MusicFont.medium, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
       Text(t.artist, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
       Spacer(Modifier.height(24.dp))
 
@@ -1365,6 +1389,7 @@ private fun NowPlaying(
     }
     }
   }
+  }
 
   if (showEditor) {
     Dialog(onDismissRequest = { showEditor = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -1385,7 +1410,7 @@ private fun NowPlaying(
           ) {
             TrackArt(q, 120, Modifier.size(42.dp), RoundedCornerShape(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-              Text(q.title, color = if (cur) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, fontWeight = if (cur) FontWeight.Bold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
+              Text(q.title, color = if (cur) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, fontWeight = if (cur) FontWeight.Bold else MusicFont.normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
               Text(q.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             IconButton(onClick = { MusicController.removeFromQueue(i) }) { Icon(Icons.Filled.Close, "Remove") }
@@ -1521,7 +1546,7 @@ private fun FoldersTab(
           contentAlignment = Alignment.Center,
         ) { Icon(Icons.Filled.Folder, null, tint = MaterialTheme.colorScheme.onSecondaryContainer) }
         Column(modifier = Modifier.weight(1f)) {
-          Text(f.name, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+          Text(f.name, fontWeight = MusicFont.medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
           Text("${f.tracks.size} songs  •  ${f.path}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         IconButton(onClick = { menuFor = f }) { Icon(Icons.Filled.MoreVert, "More") }

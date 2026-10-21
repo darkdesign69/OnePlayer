@@ -25,6 +25,12 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -87,7 +93,7 @@ private fun tinted(
  * cards, bars and panels visible when the app uses a see-through custom theme.
  */
 @Composable
-internal fun MusicPanelTheme(content: @Composable () -> Unit) {
+private fun MusicColorTheme(content: @Composable () -> Unit) {
   val context = LocalContext.current
   val sysDark = isSystemInDarkTheme()
   val appCs = MaterialTheme.colorScheme
@@ -142,6 +148,12 @@ internal fun MusicPanelTheme(content: @Composable () -> Unit) {
       )
     MaterialTheme(colorScheme = fixed, content = content)
   }
+}
+
+/** Colours, font, size, bold and italic of the whole player. */
+@Composable
+internal fun MusicPanelTheme(content: @Composable () -> Unit) {
+  MusicColorTheme { MusicTypographyTheme(content) }
 }
 
 /** A solid colour for full-screen layers such as Now playing (never see-through). */
@@ -204,7 +216,7 @@ internal fun popupColor(): Color {
 // Hub + host
 // ---------------------------------------------------------------------------------------------
 
-internal val musicSettingsTitles = listOf("Themes & Colors", "Now playing", "Library", "Images", "Audio", "Playlists")
+internal val musicSettingsTitles = listOf("Themes & Colors", "Now playing", "Library", "Images", "Audio", "Playlists", "Font")
 
 private class HubItem(
   val title: String,
@@ -220,6 +232,7 @@ private val hubItems =
     HubItem("Images", "Image caching, artwork, lockscreen art", Icons.Filled.Image),
     HubItem("Audio", "Fade audio, focus, auto play and more", Icons.Filled.MusicNote),
     HubItem("Playlists", "Last added interval, backup, import and export", Icons.AutoMirrored.Filled.QueueMusic),
+    HubItem("Font", "Font family, custom font, size, bold and italic", Icons.Filled.TextFields),
   )
 
 private fun upd(block: () -> Unit) {
@@ -242,6 +255,7 @@ internal fun MusicSettingsHost(
     3 -> ImagesPage()
     4 -> AudioPage()
     5 -> PlaylistsPage()
+    6 -> FontPage()
     else -> SettingsHub(onPage)
   }
 }
@@ -313,7 +327,7 @@ private fun ThemesPage() {
                   .background(if (sel) Color.Black else Color.Transparent)
                   .clickable { upd { MusicSettings.themeMode = mode } }
                   .padding(horizontal = 26.dp, vertical = 16.dp),
-            ) { Text(label, color = if (sel) Color.White else Color.Black, fontWeight = FontWeight.Medium) }
+            ) { Text(label, color = if (sel) Color.White else Color.Black, fontWeight = MusicFont.medium) }
           }
         }
       }
@@ -612,6 +626,100 @@ private fun AudioPage() {
     item { OtoSwitch("Pause when headphones disconnect", null, MusicSettings.pauseOnUnplug) { upd { MusicSettings.pauseOnUnplug = it } } }
     item { OtoSwitch("Remember queue and position", "Continue where you stopped next time", MusicSettings.restoreQueue) { upd { MusicSettings.restoreQueue = it } } }
     item { OtoRow("Equalizer", "Open the equalizer of your phone", true, { openEqualizer(context) }) }
+  }
+}
+
+
+// ---------------------------------------------------------------------------------------------
+// Font
+// ---------------------------------------------------------------------------------------------
+
+@Composable
+private fun FontOptionRow(
+  label: String,
+  sample: String,
+  family: FontFamily?,
+  selected: Boolean,
+  enabled: Boolean = true,
+  onClick: () -> Unit,
+) {
+  Row(
+    modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 24.dp, vertical = 14.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Column(modifier = Modifier.weight(1f)) {
+      Text(
+        label,
+        style = MaterialTheme.typography.titleMedium,
+        fontFamily = family,
+        color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+      )
+      Text(sample, style = MaterialTheme.typography.bodyMedium, fontFamily = family, color = MaterialTheme.colorScheme.outline)
+    }
+    RadioButton(selected = selected, onClick = null, enabled = enabled)
+  }
+}
+
+@Composable
+private fun FontPage() {
+  val context = LocalContext.current
+  val picker =
+    rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+      if (uri != null) {
+        val name = importCustomFont(context, uri)
+        Toast
+          .makeText(
+            context,
+            if (name != null) "Font added: $name" else "That is not a valid font. Please choose a .ttf or .otf file.",
+            Toast.LENGTH_LONG,
+          ).show()
+      }
+    }
+  val hasCustom = MusicSettings.customFontPath.isNotEmpty()
+  val customFamily = remember(MusicSettings.customFontPath) { buildFontFamily(5, MusicSettings.customFontPath, false, false) }
+  OtoPage("Font") {
+    item { OtoHeader("Font family") }
+    builtInFontNames.forEachIndexed { i, label ->
+      item {
+        val family = remember(i) { buildFontFamily(i, "", false, false) }
+        FontOptionRow(label, "The quick brown fox jumps over the lazy dog", family, MusicSettings.fontChoice == i) {
+          upd { MusicSettings.fontChoice = i }
+        }
+      }
+    }
+    item { OtoHeader("Custom font") }
+    item {
+      FontOptionRow(
+        label = "Use custom font",
+        sample = if (hasCustom) MusicSettings.customFontName else "No font added yet",
+        family = customFamily,
+        selected = MusicSettings.fontChoice == 5,
+        enabled = hasCustom,
+      ) { upd { MusicSettings.fontChoice = 5 } }
+    }
+    item { OtoRow("Add your own font", "Choose a .ttf or .otf font file from your phone", true, { picker.launch(arrayOf("*/*")) }) }
+    if (hasCustom) {
+      item { OtoRow("Remove custom font", MusicSettings.customFontName, true, { removeCustomFont(context) }) }
+    }
+    item { OtoNote("TTF and OTF are the standard font formats that work on every phone and computer. The font is used in the whole music player.") }
+    item { OtoHeader("Size and style") }
+    item {
+      Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text("Font size", style = MaterialTheme.typography.titleMedium)
+          Text("${MusicSettings.fontScale}%", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+        }
+        IconButton(onClick = { upd { MusicSettings.fontScale = (MusicSettings.fontScale - 5).coerceAtLeast(70) } }) { Icon(Icons.Filled.Remove, "Smaller text") }
+        IconButton(onClick = { upd { MusicSettings.fontScale = (MusicSettings.fontScale + 5).coerceAtMost(160) } }) { Icon(Icons.Filled.Add, "Bigger text") }
+        TextButton(onClick = { upd { MusicSettings.fontScale = 100 } }) { Text("Reset") }
+      }
+    }
+    item { OtoSlider("Text size", "100 is the normal size", MusicSettings.fontScale, 70..160) { upd { MusicSettings.fontScale = it } } }
+    item { OtoSwitch("Bold", "Make all text bold", MusicSettings.fontBold) { upd { MusicSettings.fontBold = it } } }
+    item { OtoSwitch("Italic", "Make all text italic", MusicSettings.fontItalic) { upd { MusicSettings.fontItalic = it } } }
   }
 }
 
