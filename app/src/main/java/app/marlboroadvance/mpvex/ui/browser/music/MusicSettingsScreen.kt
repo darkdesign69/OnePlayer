@@ -155,6 +155,42 @@ internal fun solidSurface(): Color {
   return lerp(base, cs.primary, 0.08f)
 }
 
+/**
+ * Keeps a part of the screen (Now playing, the mini player, the lyrics editor) looking the same whatever the
+ * app theme does: every background inside it is fully solid, so custom theme transparency can't change it.
+ */
+@Composable
+internal fun SolidThemed(content: @Composable () -> Unit) {
+  val cs = MaterialTheme.colorScheme
+  val base = solidSurface()
+  fun fix(
+    c: Color,
+    fallback: Color,
+  ): Color = if (c.alpha >= 0.99f) c else fallback
+  val container = lerp(base, cs.onSurface.copy(alpha = 1f), 0.06f)
+  val containerHigh = lerp(base, cs.onSurface.copy(alpha = 1f), 0.10f)
+  val accentContainer = lerp(base, cs.primary.copy(alpha = 1f), 0.30f)
+  val fixed =
+    cs.copy(
+      background = fix(cs.background, base),
+      surface = fix(cs.surface, base),
+      surfaceVariant = fix(cs.surfaceVariant, containerHigh),
+      surfaceDim = fix(cs.surfaceDim, base),
+      surfaceBright = fix(cs.surfaceBright, containerHigh),
+      surfaceContainerLowest = fix(cs.surfaceContainerLowest, base),
+      surfaceContainerLow = fix(cs.surfaceContainerLow, container),
+      surfaceContainer = fix(cs.surfaceContainer, container),
+      surfaceContainerHigh = fix(cs.surfaceContainerHigh, containerHigh),
+      surfaceContainerHighest = fix(cs.surfaceContainerHighest, containerHigh),
+      primaryContainer = fix(cs.primaryContainer, accentContainer),
+      secondaryContainer = fix(cs.secondaryContainer, accentContainer),
+      tertiaryContainer = fix(cs.tertiaryContainer, accentContainer),
+      errorContainer = fix(cs.errorContainer, containerHigh),
+      inverseSurface = fix(cs.inverseSurface, containerHigh),
+    )
+  MaterialTheme(colorScheme = fixed, content = content)
+}
+
 /** Background for menus, dialogs and sheets: always solid so the text stays readable. */
 @Composable
 internal fun popupColor(): Color {
@@ -385,7 +421,7 @@ private fun NowPlayingPage() {
     item { OtoSwitch("Swipe cover to change song", null, MusicSettings.swipeCover) { upd { MusicSettings.swipeCover = it } } }
     item { OtoSwitch("Show favorite button", null, MusicSettings.showFavButton) { upd { MusicSettings.showFavButton = it } } }
     item { OtoSwitch("Show sleep timer and queue buttons", null, MusicSettings.showExtraControls) { upd { MusicSettings.showExtraControls = it } } }
-    item { OtoSwitch("Open Now playing when a song starts", null, MusicSettings.openNowOnPlay) { upd { MusicSettings.openNowOnPlay = it } } }
+    item { OtoSwitch("Open Now playing when a song starts", "Off: Now playing only opens when you tap the mini player", MusicSettings.openNowOnPlay) { upd { MusicSettings.openNowOnPlay = it } } }
     item { OtoSwitch("Keep screen on", "While Now playing is open", MusicSettings.keepScreenOn) { upd { MusicSettings.keepScreenOn = it } } }
   }
 }

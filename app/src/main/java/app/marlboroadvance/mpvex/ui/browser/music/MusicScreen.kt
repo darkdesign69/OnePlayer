@@ -59,6 +59,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.AddToQueue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.ui.graphics.lerp
@@ -294,6 +300,7 @@ object MusicScreen : Screen {
     var sortMenu by remember { mutableStateOf(false) }
 
     var addTarget by remember { mutableStateOf<MusicTrack?>(null) }
+    var addMany by remember { mutableStateOf<List<MusicTrack>?>(null) }
     var infoTarget by remember { mutableStateOf<MusicTrack?>(null) }
     var newPlaylistFor by remember { mutableStateOf<Long?>(null) }
     var newPlaylistDialog by remember { mutableStateOf(false) }
@@ -494,7 +501,7 @@ object MusicScreen : Screen {
         },
         bottomBar = {
           Column {
-            if (MusicController.current != null) MiniPlayer(onOpen = { showNow = true })
+            if (MusicController.current != null) SolidThemed { MiniPlayer(onOpen = { showNow = true }) }
             NavigationBar {
               val items =
                 listOf(
@@ -618,7 +625,24 @@ object MusicScreen : Screen {
                   }
                 }
               }
-            tab == 5 -> FoldersTab(folders) { detail = Detail.FolderD(it.path, it.name) }
+            tab == 5 ->
+              FoldersTab(
+                folders = folders,
+                onOpen = { detail = Detail.FolderD(it.path, it.name) },
+                onPlay = { f ->
+                  startPlay(f.tracks, 0)
+                  openNow()
+                },
+                onPlayNext = { f ->
+                  if (MusicController.queue.isEmpty()) startPlay(f.tracks, 0) else f.tracks.reversed().forEach { MusicController.playNext(it) }
+                  Toast.makeText(context, "Playing next", Toast.LENGTH_SHORT).show()
+                },
+                onQueue = { f ->
+                  f.tracks.forEach { MusicController.addToQueue(it) }
+                  Toast.makeText(context, "Added to the queue", Toast.LENGTH_SHORT).show()
+                },
+                onAddToPlaylist = { f -> addMany = f.tracks },
+              )
             else ->
               PlaylistsTab(
                 onOpen = { detail = it },
@@ -633,7 +657,7 @@ object MusicScreen : Screen {
         enter = slideInVertically { it },
         exit = slideOutVertically { it },
       ) {
-        NowPlaying(onClose = { showNow = false }, actions = actions)
+        SolidThemed { NowPlaying(onClose = { showNow = false }, actions = actions) }
       }
     }
 
@@ -676,6 +700,37 @@ object MusicScreen : Screen {
           ) { Text("Create") }
         },
         dismissButton = { TextButton(onClick = { newPlaylistDialog = false; newPlaylistFor = null }) { Text("Cancel") } },
+      )
+    }
+    addMany?.let { list ->
+      var newName by remember(list) { mutableStateOf("") }
+      AlertDialog(
+        containerColor = popupColor(),
+        onDismissRequest = { addMany = null },
+        title = { Text("Add ${list.size} songs to playlist") },
+        text = {
+          Column {
+            TextField(value = newName, onValueChange = { newName = it }, singleLine = true, placeholder = { Text("New playlist name") })
+            TextButton(
+              enabled = newName.isNotBlank(),
+              onClick = {
+                val n = newName.trim()
+                MusicController.createPlaylist(n)
+                list.forEach { MusicController.addToPlaylist(n, it.id) }
+                addMany = null
+              },
+            ) { Text("Create and add") }
+            MusicController.playlists.keys.forEach { name ->
+              TextButton(
+                onClick = {
+                  list.forEach { MusicController.addToPlaylist(name, it.id) }
+                  addMany = null
+                },
+              ) { Text(name) }
+            }
+          }
+        },
+        confirmButton = { TextButton(onClick = { addMany = null }) { Text("Cancel") } },
       )
     }
     infoTarget?.let { t ->
@@ -974,25 +1029,36 @@ private fun SongRow(
         overflow = TextOverflow.Ellipsis,
       )
     }
-    Box {
-      IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, "More") }
-      DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = popupColor()) {
-        @Composable
-        fun item(
-          label: String,
-          run: () -> Unit,
-        ) = DropdownMenuItem(text = { Text(label) }, onClick = { menu = false; run() })
-        item("Play next") { actions.playNext(track) }
-        item("Add to playing queue") { actions.addToQueue(track) }
-        item(if (track.id in MusicController.favorites) "Remove from favorites" else "Add to favorites") { MusicController.toggleFavorite(track.id) }
-        item("Add to playlist") { actions.addToPlaylist(track) }
-        item("Go to album") { actions.goAlbum(track) }
-        item("Go to artist") { actions.goArtist(track) }
-        item("Share") { actions.share(track) }
-        item("Details") { actions.info(track) }
-        if (extra != null) item("Remove from playlist") { extra() }
-      }
-    }
+    IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, "More") }
+  }
+  if (menu) {
+    val fav = track.id in MusicController.favorites
+    val ctx = LocalContext.current
+    ActionSheet(
+      title = track.title,
+      subtitle = track.artist,
+      leading = { TrackArt(track, 140, Modifier.size(56.dp), RoundedCornerShape(12.dp)) },
+      items =
+        buildList {
+          add(SheetItem("Play", Icons.Filled.PlayArrow) { onClick() })
+          add(SheetItem("Play next", Icons.Filled.SkipNext) { actions.playNext(track) })
+          add(SheetItem("Add to playing queue", Icons.Filled.AddToQueue) { actions.addToQueue(track) })
+          add(SheetItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd) { actions.addToPlaylist(track) })
+          add(
+            SheetItem(if (fav) "Remove from favorites" else "Add to favorites", if (fav) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder) {
+              MusicController.toggleFavorite(track.id)
+            },
+          )
+          if (extra != null) add(SheetItem("Remove from playlist", Icons.Filled.Delete) { extra() })
+          add(SheetItem("Go to album", Icons.Filled.Album, divider = true) { actions.goAlbum(track) })
+          add(SheetItem("Go to artist", Icons.Filled.Person) { actions.goArtist(track) })
+          add(SheetItem("Details", Icons.Filled.Info) { actions.info(track) })
+          add(SheetItem("Share", Icons.Filled.Share) { actions.share(track) })
+          val folder = track.path.substringBeforeLast('/', "")
+          if (folder.isNotEmpty()) add(SheetItem("Blacklist", Icons.Filled.VisibilityOff, divider = true) { blacklistFolder(ctx, folder) })
+        },
+      onDismiss = { menu = false },
+    )
   }
 }
 
@@ -1432,7 +1498,13 @@ private fun lastAdded(tracks: List<MusicTrack>): List<MusicTrack> {
 private fun FoldersTab(
   folders: List<FolderItem>,
   onOpen: (FolderItem) -> Unit,
+  onPlay: (FolderItem) -> Unit,
+  onPlayNext: (FolderItem) -> Unit,
+  onQueue: (FolderItem) -> Unit,
+  onAddToPlaylist: (FolderItem) -> Unit,
 ) {
+  val ctx = LocalContext.current
+  var menuFor by remember { mutableStateOf<FolderItem?>(null) }
   if (folders.isEmpty()) {
     Text("No folders found", color = MaterialTheme.colorScheme.outline)
     return
@@ -1440,7 +1512,7 @@ private fun FoldersTab(
   LazyColumn(modifier = Modifier.fillMaxSize()) {
     items(folders, key = { it.path }) { f ->
       Row(
-        modifier = Modifier.fillMaxWidth().clickable { onOpen(f) }.padding(horizontal = 16.dp, vertical = 10.dp),
+        modifier = Modifier.fillMaxWidth().clickable { onOpen(f) }.padding(start = 16.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
       ) {
@@ -1452,9 +1524,84 @@ private fun FoldersTab(
           Text(f.name, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
           Text("${f.tracks.size} songs  •  ${f.path}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+        IconButton(onClick = { menuFor = f }) { Icon(Icons.Filled.MoreVert, "More") }
       }
     }
   }
+  menuFor?.let { f ->
+    ActionSheet(
+      title = f.name,
+      subtitle = "${f.tracks.size} songs",
+      leading = { Icon(Icons.Filled.Folder, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+      items =
+        listOf(
+          SheetItem("Play", Icons.Filled.PlayArrow) { onPlay(f) },
+          SheetItem("Play next", Icons.Filled.SkipNext) { onPlayNext(f) },
+          SheetItem("Add to playing queue", Icons.Filled.AddToQueue) { onQueue(f) },
+          SheetItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd) { onAddToPlaylist(f) },
+          SheetItem("Blacklist", Icons.Filled.VisibilityOff, divider = true) { blacklistFolder(ctx, f.path) },
+        ),
+      onDismiss = { menuFor = null },
+    )
+  }
+}
+
+internal class SheetItem(
+  val label: String,
+  val icon: ImageVector,
+  val divider: Boolean = false,
+  val onClick: () -> Unit,
+)
+
+/** Bottom sheet with a header and a list of actions (like the Oto song and folder menus). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ActionSheet(
+  title: String,
+  subtitle: String?,
+  leading: @Composable () -> Unit,
+  items: List<SheetItem>,
+  onDismiss: () -> Unit,
+) {
+  ModalBottomSheet(onDismissRequest = onDismiss, containerColor = popupColor()) {
+    Row(
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+      leading()
+      Column {
+        Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis)
+      }
+    }
+    HorizontalDivider()
+    Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+      items.forEach { it0 ->
+        if (it0.divider) HorizontalDivider(modifier = Modifier.padding(start = 72.dp, top = 4.dp, bottom = 4.dp))
+        Row(
+          modifier = Modifier.fillMaxWidth().clickable { onDismiss(); it0.onClick() }.padding(horizontal = 24.dp, vertical = 16.dp),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(28.dp),
+        ) {
+          Icon(it0.icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+          Text(it0.label, style = MaterialTheme.typography.bodyLarge)
+        }
+      }
+    }
+  }
+}
+
+private fun blacklistFolder(
+  ctx: Context,
+  folder: String,
+) {
+  val cur = MusicSettings.excluded()
+  if (folder !in cur) {
+    MusicSettings.excludedFolders = (cur + folder).joinToString("|")
+    MusicSettings.save()
+  }
+  Toast.makeText(ctx, "Folder hidden. Undo it in Settings > Library > Blacklist", Toast.LENGTH_LONG).show()
 }
 
 private fun shareTrack(

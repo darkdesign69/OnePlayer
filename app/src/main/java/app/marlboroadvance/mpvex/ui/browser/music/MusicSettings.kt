@@ -60,7 +60,7 @@ object MusicSettings {
   var swipeCover by mutableStateOf(true)
   var showFavButton by mutableStateOf(true)
   var showExtraControls by mutableStateOf(true)
-  var openNowOnPlay by mutableStateOf(true)
+  var openNowOnPlay by mutableStateOf(false)
 
   // ---- Personalize / images ----
 
@@ -171,7 +171,7 @@ object MusicSettings {
       "swipeCover" to swipeCover,
       "showFavButton" to showFavButton,
       "showExtraControls" to showExtraControls,
-      "openNowOnPlay" to openNowOnPlay,
+      "openNowOnPlay2" to openNowOnPlay,
       "tabsMask2" to tabsMask,
       "miniControls" to miniControls,
       "gridColumns" to gridColumns,
@@ -230,7 +230,7 @@ object MusicSettings {
     swipeCover = b("swipeCover", swipeCover)
     showFavButton = b("showFavButton", showFavButton)
     showExtraControls = b("showExtraControls", showExtraControls)
-    openNowOnPlay = b("openNowOnPlay", openNowOnPlay)
+    openNowOnPlay = b("openNowOnPlay2", openNowOnPlay)
     tabsMask = (i("tabsMask2", tabsMask) and 63).let { if (it == 0) 63 else it }
     miniControls = i("miniControls", miniControls).coerceIn(0, 2)
     gridColumns = i("gridColumns", gridColumns).coerceIn(2, 4)
@@ -313,7 +313,7 @@ object MusicSettings {
     swipeCover = true
     showFavButton = true
     showExtraControls = true
-    openNowOnPlay = true
+    openNowOnPlay = false
     tabsMask = 63
     miniControls = 0
     gridColumns = 2
