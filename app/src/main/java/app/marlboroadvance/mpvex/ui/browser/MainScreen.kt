@@ -13,6 +13,12 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
+import app.marlboroadvance.mpvex.ui.browser.music.HomeMiniAudioBar
+import app.marlboroadvance.mpvex.ui.browser.music.MusicNav
+import app.marlboroadvance.mpvex.ui.browser.music.MusicScreen
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -105,12 +111,23 @@ object MainScreen : Screen {
   override fun Content() {
     // The bottom tab bar was removed. Recents, Playlists and Network are now in Settings.
     Scaffold(modifier = Modifier.fillMaxSize()) { _ ->
-      Box(modifier = Modifier.fillMaxSize()) {
-        CompositionLocalProvider(
-          LocalNavigationBarHeight provides 16.dp,
-        ) {
-          FolderListScreen.Content()
+      val backstack = LocalBackStack.current
+      Column(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+          CompositionLocalProvider(
+            LocalNavigationBarHeight provides 16.dp,
+          ) {
+            FolderListScreen.Content()
+          }
         }
+        // Mini player bar: shows the song that is playing, like XPlayer
+        HomeMiniAudioBar(
+          onOpenNow = {
+            MusicNav.openNow = true
+            backstack.add(MusicScreen)
+          },
+          onOpenLibrary = { backstack.add(MusicScreen) },
+        )
       }
     }
   }

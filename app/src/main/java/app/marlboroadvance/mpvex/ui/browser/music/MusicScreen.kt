@@ -288,7 +288,7 @@ object MusicScreen : Screen {
       if (!MusicSettings.isTabVisible(tab)) tab = MusicSettings.firstVisibleTab()
     }
     var detail by remember { mutableStateOf<Detail?>(null) }
-    var showNow by remember { mutableStateOf(false) }
+    var showNow by remember { mutableStateOf(MusicNav.takeOpenNow()) }
     var searching by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var sortBy by remember { mutableIntStateOf(MusicSettings.sortBy) }
