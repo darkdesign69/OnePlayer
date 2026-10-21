@@ -7,6 +7,9 @@ import android.provider.OpenableColumns
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.remember
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -17,6 +20,8 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.isSpecified
 import app.marlboroadvance.mpvex.R
 import java.io.File
+
+private val LocalFontApplied = compositionLocalOf { false }
 
 /** Font weights that follow the "Bold" font option (use these instead of FontWeight.Normal / Medium). */
 internal object MusicFont {
@@ -78,6 +83,12 @@ private fun TextStyle.restyle(
 /** Applies the font, size, bold and italic options to every text of the player (dialogs and menus too). */
 @Composable
 internal fun MusicTypographyTheme(content: @Composable () -> Unit) {
+  // Already applied by an outer theme (the whole app): do not apply it twice.
+  if (LocalFontApplied.current) {
+    content()
+    return
+  }
+  MusicSettings.init(LocalContext.current)
   val choice = MusicSettings.fontChoice
   val path = MusicSettings.customFontPath
   val bold = MusicSettings.fontBold
@@ -85,7 +96,7 @@ internal fun MusicTypographyTheme(content: @Composable () -> Unit) {
   val scale = MusicSettings.fontScale / 100f
   val family = remember(choice, path, bold, italic) { buildFontFamily(choice, path, bold, italic) }
   if (family == null && scale == 1f && !bold && !italic) {
-    content()
+    CompositionLocalProvider(LocalFontApplied provides true, content = content)
   } else {
     val base = MaterialTheme.typography
     val typo =
@@ -108,7 +119,9 @@ internal fun MusicTypographyTheme(content: @Composable () -> Unit) {
           labelSmall = base.labelSmall.restyle(family, scale, bold, italic),
         )
       }
-    MaterialTheme(typography = typo, content = content)
+    CompositionLocalProvider(LocalFontApplied provides true) {
+      MaterialTheme(typography = typo, content = content)
+    }
   }
 }
 

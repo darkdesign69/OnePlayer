@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Subtitles
+import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -249,6 +250,26 @@ object PreferencesScreen : Screen {
                   ) 
                 },
                 onClick = { backstack.add(PlayerControlsPreferencesScreen) },
+              )
+
+              PreferenceDivider()
+
+              Preference(
+                title = { Text(text = "Font") },
+                summary = {
+                  Text(
+                    text = "Font family, custom font, size, bold and italic",
+                    color = MaterialTheme.colorScheme.outline,
+                  )
+                },
+                icon = {
+                  Icon(
+                    Icons.Outlined.TextFields,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                  )
+                },
+                onClick = { backstack.add(FontSettingsScreen) },
               )
             }
           }

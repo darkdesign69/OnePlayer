@@ -303,7 +303,7 @@ fun MpvexTheme(
             MaterialTheme(
                 colorScheme = colorScheme,
                 typography = AppTypography,
-                content = themedContent,
+                content = { app.marlboroadvance.mpvex.ui.browser.music.MusicTypographyTheme(themedContent) },
                 motionScheme = MotionScheme.expressive(),
             )
         }

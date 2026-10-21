@@ -790,7 +790,7 @@ private fun VideoListContent(
 
         val columns = when (mediaLayoutMode) {
           MediaLayoutMode.LIST -> 1
-          MediaLayoutMode.GRID -> 3
+          MediaLayoutMode.GRID -> videoGridColumns
         }
 
         if (mediaLayoutMode == MediaLayoutMode.GRID) {
@@ -840,7 +840,7 @@ private fun VideoListContent(
                   { onVideoClick(videoWithInfo.video) }
                 },
                 isGridMode = mediaLayoutMode == MediaLayoutMode.GRID,
-                gridColumns = 3,
+                gridColumns = videoGridColumns,
                 showSubtitleIndicator = showSubtitleIndicator,
                 allowThumbnailGeneration = false,
               )
