@@ -20,7 +20,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.SelectAll
@@ -34,6 +33,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +42,9 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileInputStream
+import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
@@ -213,7 +216,7 @@ internal fun LyricsPanel(
 
   LaunchedEffect(track.id, LyricsStore.version) {
     busy = true
-    raw = withContext(Dispatchers.IO) { LyricsStore.load(ctx, track) }
+    raw = withContext(Dispatchers.IO) { LyricsStore.load(ctx, track) ?: readEmbeddedLyrics(ctx, track) }
     busy = false
     if (raw == null && MusicSettings.lyricsAuto) search()
   }
@@ -229,13 +232,16 @@ internal fun LyricsPanel(
         if (busy) {
           CircularProgressIndicator()
           Spacer(Modifier.height(12.dp))
-          Text("Searching lyrics online…")
+          Text("Searching lyrics online…", style = MaterialTheme.typography.titleMedium)
         } else {
-          Text(if (failed) "No lyrics found online" else "No lyrics for this song", style = MaterialTheme.typography.titleMedium)
-          Spacer(Modifier.height(12.dp))
-          FilledTonalButton(onClick = { search() }) { Text("Search online") }
-          Spacer(Modifier.height(8.dp))
-          OutlinedButton(onClick = onEdit) { Text("Add lyrics manually") }
+          Text(if (failed) "No lyrics found" else "No embedded lyrics found", style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+          Text(
+            "Tap to edit",
+            style = MaterialTheme.typography.titleMedium,
+            textDecoration = TextDecoration.Underline,
+            modifier = Modifier.clickable(onClick = onEdit).padding(8.dp),
+          )
+          TextButton(onClick = { search() }) { Text("Search online") }
         }
       }
     } else {
@@ -266,7 +272,6 @@ internal fun LyricsPanel(
           )
         }
       }
-      IconButton(onClick = onEdit, modifier = Modifier.align(Alignment.TopEnd)) { Icon(Icons.Filled.Edit, "Edit lyrics") }
     }
   }
 }
@@ -306,7 +311,7 @@ internal fun LyricsEditor(
           value = tf,
           onValueChange = { tf = it },
           modifier = Modifier.fillMaxSize(),
-          placeholder = { Text("Paste or type lyrics. Lines like [01:23.45] text make them scroll with the song.") },
+          placeholder = { Text("Paste synced or normal lyrics here") },
           colors =
             TextFieldDefaults.colors(
               focusedContainerColor = Color.Transparent,
@@ -443,4 +448,143 @@ internal fun trackFromUri(
   }
   val id = -((uri.toString().hashCode().toLong() and 0x7fffffffL) + 1)
   return MusicTrack(id, title, artist, album, 0L, dur, System.currentTimeMillis() / 1000, "", uri)
+}
+
+// ---------------------------------------------------------------------------------------------
+// Lyrics stored inside the audio file (MP3 "USLT" tag, M4A/MP4 "©lyr" tag)
+// ---------------------------------------------------------------------------------------------
+
+internal fun readEmbeddedLyrics(
+  ctx: Context,
+  t: MusicTrack,
+): String? =
+  try {
+    ctx.contentResolver.openFileDescriptor(t.uri, "r")?.use { pfd ->
+      val ch = FileInputStream(pfd.fileDescriptor).channel
+      val head = ByteBuffer.allocate(12)
+      ch.read(head, 0)
+      val b = head.array()
+      when {
+        b[0] == 'I'.code.toByte() && b[1] == 'D'.code.toByte() && b[2] == '3'.code.toByte() -> readId3Lyrics(ch)
+        b[4] == 'f'.code.toByte() && b[5] == 't'.code.toByte() && b[6] == 'y'.code.toByte() && b[7] == 'p'.code.toByte() -> readMp4Lyrics(ch)
+        else -> null
+      }
+    }
+  } catch (_: Exception) {
+    null
+  }
+
+private fun beInt(
+  a: ByteArray,
+  o: Int,
+): Int = ((a[o].toInt() and 0xFF) shl 24) or ((a[o + 1].toInt() and 0xFF) shl 16) or ((a[o + 2].toInt() and 0xFF) shl 8) or (a[o + 3].toInt() and 0xFF)
+
+private fun synchsafe(
+  a: ByteArray,
+  o: Int,
+): Int = ((a[o].toInt() and 0x7F) shl 21) or ((a[o + 1].toInt() and 0x7F) shl 14) or ((a[o + 2].toInt() and 0x7F) shl 7) or (a[o + 3].toInt() and 0x7F)
+
+private fun readFully(
+  ch: FileChannel,
+  buf: ByteBuffer,
+  from: Long,
+) {
+  var p = from
+  while (buf.hasRemaining()) {
+    val n = ch.read(buf, p)
+    if (n <= 0) break
+    p += n
+  }
+}
+
+private fun readId3Lyrics(ch: FileChannel): String? {
+  val h = ByteBuffer.allocate(10)
+  readFully(ch, h, 0)
+  val a = h.array()
+  val ver = a[3].toInt()
+  val tagSize = synchsafe(a, 6)
+  if (tagSize <= 0) return null
+  val buf = ByteBuffer.allocate(minOf(tagSize, 8 * 1024 * 1024))
+  readFully(ch, buf, 10)
+  val d = buf.array()
+  var p = 0
+  while (p + 10 <= d.size) {
+    if (d[p].toInt() == 0) break
+    val id = String(d, p, 4, Charsets.ISO_8859_1)
+    val size = if (ver == 4) synchsafe(d, p + 4) else beInt(d, p + 4)
+    if (size <= 0 || p + 10 + size > d.size) break
+    if (id == "USLT") return decodeUslt(d, p + 10, size)
+    p += 10 + size
+  }
+  return null
+}
+
+private fun decodeUslt(
+  d: ByteArray,
+  off: Int,
+  len: Int,
+): String? {
+  if (len < 5) return null
+  val enc = d[off].toInt()
+  val start = off + 4
+  val end = off + len
+  var textStart = start
+  if (enc == 0 || enc == 3) {
+    while (textStart < end && d[textStart].toInt() != 0) textStart++
+    textStart += 1
+  } else {
+    while (textStart + 1 < end && !(d[textStart].toInt() == 0 && d[textStart + 1].toInt() == 0)) textStart += 2
+    textStart += 2
+  }
+  if (textStart >= end) return null
+  val cs =
+    when (enc) {
+      1 -> Charsets.UTF_16
+      2 -> Charsets.UTF_16BE
+      3 -> Charsets.UTF_8
+      else -> Charsets.ISO_8859_1
+    }
+  return String(d, textStart, end - textStart, cs).trim().takeIf { it.isNotBlank() }
+}
+
+private fun readMp4Lyrics(ch: FileChannel): String? {
+  val size = ch.size()
+  var pos = 0L
+  while (pos + 8 <= size) {
+    val hdr = ByteBuffer.allocate(16)
+    readFully(ch, hdr, pos)
+    val h = hdr.array()
+    var boxSize = beInt(h, 0).toLong() and 0xFFFFFFFFL
+    val type = String(h, 4, 4, Charsets.ISO_8859_1)
+    var header = 8L
+    if (boxSize == 1L) {
+      boxSize = ByteBuffer.wrap(h, 8, 8).long
+      header = 16L
+    } else if (boxSize == 0L) {
+      boxSize = size - pos
+    }
+    if (boxSize < header) return null
+    if (type == "moov" && boxSize - header < 32L * 1024 * 1024) {
+      val buf = ByteBuffer.allocate((boxSize - header).toInt())
+      readFully(ch, buf, pos + header)
+      return findMp4Lyrics(buf.array())
+    }
+    pos += boxSize
+  }
+  return null
+}
+
+private fun findMp4Lyrics(a: ByteArray): String? {
+  var i = 0
+  while (i + 24 < a.size) {
+    if (a[i] == 0xA9.toByte() && a[i + 1] == 'l'.code.toByte() && a[i + 2] == 'y'.code.toByte() && a[i + 3] == 'r'.code.toByte()) {
+      val dataSize = beInt(a, i + 4)
+      val tag = String(a, i + 8, 4, Charsets.ISO_8859_1)
+      if (tag == "data" && dataSize > 16 && i + 4 + dataSize <= a.size) {
+        return String(a, i + 4 + 16, dataSize - 16, Charsets.UTF_8).trim().takeIf { it.isNotBlank() }
+      }
+    }
+    i++
+  }
+  return null
 }

@@ -78,23 +78,24 @@ fun loadArt(
   track: MusicTrack,
   size: Int,
 ): Bitmap? {
-  val key = (if (track.albumId > 0) "a${track.albumId}" else "t${track.id}") + "_$size"
+  val useStore = MusicSettings.useMediaStoreArt
+  val key = (if (track.albumId > 0 && useStore) "a${track.albumId}" else "t${track.id}") + "_$size" + (if (useStore) "" else "_f")
   artCache.get(key)?.let { return it }
   var bmp: Bitmap? = null
   try {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+    if (useStore && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
       bmp = context.contentResolver.loadThumbnail(track.uri, Size(size, size), null)
     }
   } catch (_: Exception) {
   }
-  if (bmp == null && track.albumId > 0) {
+  if (useStore && bmp == null && track.albumId > 0) {
     try {
       val artUri = ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), track.albumId)
       context.contentResolver.openInputStream(artUri)?.use { bmp = BitmapFactory.decodeStream(it) }
     } catch (_: Exception) {
     }
   }
-  if (bmp == null && track.id < 0) {
+  if (bmp == null && (track.id < 0 || !useStore)) {
     // files added by hand: read the cover stored inside the file
     val r = android.media.MediaMetadataRetriever()
     try {
@@ -109,7 +110,7 @@ fun loadArt(
       }
     }
   }
-  bmp?.let { artCache.put(key, it) }
+  if (MusicSettings.cacheImages) bmp?.let { artCache.put(key, it) }
   return bmp
 }
 
@@ -175,6 +176,8 @@ fun loadMusicTracks(context: Context): List<MusicTrack> {
   } catch (_: Exception) {
     // empty list => "No music found"
   }
+  val excluded = MusicSettings.excluded()
+  if (excluded.isNotEmpty()) return result.filter { t -> excluded.none { t.path.startsWith(it) } }
   return result
 }
 
@@ -238,7 +241,9 @@ object MusicController {
     if (initialised) return
     initialised = true
     app = context.applicationContext
+    MusicSettings.init(app)
     loadPrefs()
+    registerDeviceCallback()
     session =
       MediaSessionCompat(app, "OnePlayerMusic").apply {
         setCallback(
@@ -325,6 +330,7 @@ object MusicController {
         if (seekOnStart > 0) it.seekTo(seekOnStart)
         it.start()
         isPlaying = true
+        fadeIn()
         onStateChanged()
       }
       mp.setOnCompletionListener { onComplete() }
@@ -369,17 +375,118 @@ object MusicController {
     val mp = player ?: return
     if (!prepared) return
     if (!requestFocus()) return
+    cancelFade()
     mp.start()
     isPlaying = true
+    fadeIn()
     onStateChanged()
   }
 
   fun pause() {
     val mp = player ?: return
-    if (prepared && mp.isPlaying) mp.pause()
+    if (prepared && mp.isPlaying) {
+      if (MusicSettings.audioFade) {
+        isPlaying = false
+        fade(1f, 0f) {
+          try {
+            mp.pause()
+            mp.setVolume(1f, 1f)
+          } catch (_: Exception) {
+          }
+        }
+        onStateChanged()
+        return
+      }
+      mp.pause()
+    }
     isPlaying = false
     onStateChanged()
   }
+
+  private var fadeRunnable: Runnable? = null
+
+  private fun cancelFade() {
+    fadeRunnable?.let { handler.removeCallbacks(it) }
+    fadeRunnable = null
+    try {
+      player?.setVolume(1f, 1f)
+    } catch (_: Exception) {
+    }
+  }
+
+  private fun fadeIn() {
+    if (MusicSettings.audioFade) fade(0f, 1f, null)
+  }
+
+  private fun fade(
+    from: Float,
+    to: Float,
+    then: (() -> Unit)?,
+  ) {
+    fadeRunnable?.let { handler.removeCallbacks(it) }
+    val mp = player ?: return
+    var v = from
+    val step = if (to > from) 0.1f else -0.1f
+    try {
+      mp.setVolume(from, from)
+    } catch (_: Exception) {
+    }
+    val r =
+      object : Runnable {
+        override fun run() {
+          v += step
+          val c = v.coerceIn(0f, 1f)
+          try {
+            player?.setVolume(c, c)
+          } catch (_: Exception) {
+          }
+          val more = if (step > 0) v < to else v > to
+          if (more) {
+            handler.postDelayed(this, 40)
+          } else {
+            fadeRunnable = null
+            then?.invoke()
+          }
+        }
+      }
+    fadeRunnable = r
+    handler.post(r)
+  }
+
+  private fun registerDeviceCallback() {
+    try {
+      val am = app.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+      val t0 = System.currentTimeMillis()
+      am.registerAudioDeviceCallback(
+        object : android.media.AudioDeviceCallback() {
+          override fun onAudioDevicesAdded(added: Array<out android.media.AudioDeviceInfo>) {
+            if (System.currentTimeMillis() - t0 < 1500) return
+            if (!MusicSettings.autoPlay || isPlaying || queue.isEmpty()) return
+            val ok =
+              added.any {
+                it.isSink &&
+                  (
+                    it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+                      it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+                      it.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                      it.type == android.media.AudioDeviceInfo.TYPE_USB_HEADSET
+                  )
+              }
+            if (ok) resume()
+          }
+        },
+        handler,
+      )
+    } catch (_: Exception) {
+    }
+  }
+
+  private fun fakeBlur(b: Bitmap): Bitmap =
+    try {
+      Bitmap.createScaledBitmap(Bitmap.createScaledBitmap(b, 24, 24, true), 512, 512, true)
+    } catch (_: Exception) {
+      b
+    }
 
   fun togglePlay() {
     if (isPlaying) pause() else resume()
@@ -715,11 +822,26 @@ object MusicController {
                 resumeOnFocus = false
                 pause()
               }
+              AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                if (MusicSettings.duck) {
+                  try {
+                    player?.setVolume(0.2f, 0.2f)
+                  } catch (_: Exception) {
+                  }
+                } else {
+                  resumeOnFocus = isPlaying
+                  pause()
+                }
+              }
               AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
                 resumeOnFocus = isPlaying
                 pause()
               }
               AudioManager.AUDIOFOCUS_GAIN -> {
+                try {
+                  player?.setVolume(1f, 1f)
+                } catch (_: Exception) {
+                }
                 if (resumeOnFocus) {
                   resumeOnFocus = false
                   resume()
@@ -777,7 +899,7 @@ object MusicController {
       md.putString(MediaMetadataCompat.METADATA_KEY_ARTIST, t.artist)
       md.putString(MediaMetadataCompat.METADATA_KEY_ALBUM, t.album)
       md.putLong(MediaMetadataCompat.METADATA_KEY_DURATION, t.durationMs)
-      notifArt?.let { md.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, it) }
+      if (MusicSettings.lockArt) notifArt?.let { md.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, if (MusicSettings.lockBlur) fakeBlur(it) else it) }
     }
     s.setMetadata(md.build())
     val state = if (isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED
@@ -831,7 +953,7 @@ object MusicController {
       .setContentTitle(t?.title ?: "Music")
       .setContentText(t?.artist ?: "")
       .setSubText(t?.album)
-      .setLargeIcon(notifArt)
+      .setLargeIcon(if (MusicSettings.lockArt) (if (MusicSettings.lockBlur) notifArt?.let { fakeBlur(it) } else notifArt) else null)
       .setContentIntent(content)
       .setOnlyAlertOnce(true)
       .setOngoing(isPlaying)

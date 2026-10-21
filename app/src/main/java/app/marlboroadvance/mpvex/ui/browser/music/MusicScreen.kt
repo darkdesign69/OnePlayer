@@ -59,6 +59,17 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.material.icons.filled.SpeakerNotesOff
+import androidx.compose.material.icons.filled.SpeakerNotes
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Bedtime
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -156,6 +167,12 @@ private data class AlbumItem(
   val tracks: List<MusicTrack>,
 )
 
+private data class FolderItem(
+  val path: String,
+  val name: String,
+  val tracks: List<MusicTrack>,
+)
+
 private data class ArtistItem(
   val name: String,
   val tracks: List<MusicTrack>,
@@ -169,6 +186,11 @@ private sealed interface Detail {
     val key: Long,
     override val title: String,
     val artist: String,
+  ) : Detail
+
+  data class FolderD(
+    val path: String,
+    override val title: String,
   ) : Detail
 
   data class ArtistD(
@@ -233,7 +255,7 @@ object MusicScreen : Screen {
     var reloadKey by remember { mutableIntStateOf(0) }
     var scanning by remember { mutableStateOf(false) }
 
-    LaunchedEffect(granted, reloadKey, MusicSettings.minDurationSec) {
+    LaunchedEffect(granted, reloadKey, MusicSettings.minDurationSec, MusicSettings.excludedFolders) {
       if (granted) {
         loading = true
         tracks = withContext(Dispatchers.IO) { loadMusicTracks(context) }
@@ -278,7 +300,15 @@ object MusicScreen : Screen {
 
     val byId = remember(tracks) { tracks.associateBy { it.id } }
     val albums = remember(tracks) { buildAlbums(tracks) }
-    val artists = remember(tracks) { buildArtists(tracks) }
+    val artists = remember(tracks, MusicSettings.multiArtists, MusicSettings.artistSeparators) { buildArtists(tracks) }
+    val folders =
+      remember(tracks) {
+        tracks
+          .groupBy { it.path.substringBeforeLast('/', "") }
+          .filter { it.key.isNotEmpty() }
+          .map { (path, v) -> FolderItem(path, path.substringAfterLast('/'), v) }
+          .sortedBy { it.name.lowercase() }
+      }
     val sortedSongs =
       remember(tracks, sortBy, sortDesc) {
         val cmp: Comparator<MusicTrack> =
@@ -312,7 +342,7 @@ object MusicScreen : Screen {
       ) {
         notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
       }
-      if (shuffle) MusicController.shuffleAll(list) else MusicController.play(list, i, false)
+      if (shuffle) MusicController.shuffleAll(list) else MusicController.play(list, i, MusicController.shuffle && MusicSettings.keepShuffle)
     }
 
     fun openNow() {
@@ -323,11 +353,12 @@ object MusicScreen : Screen {
       when (d) {
         is Detail.AlbumD -> albums.firstOrNull { it.key == d.key }?.tracks.orEmpty()
         is Detail.ArtistD -> artists.firstOrNull { it.name == d.title }?.tracks.orEmpty()
+        is Detail.FolderD -> tracks.filter { it.path.substringBeforeLast('/', "") == d.path }
         is Detail.ListD ->
           when (d.kind) {
             "fav" -> MusicController.favorites.mapNotNull { byId[it] }
             "history" -> MusicController.history.mapNotNull { byId[it] }
-            "recent" -> tracks.sortedByDescending { it.dateAdded }.take(100)
+            "recent" -> lastAdded(tracks).take(200)
             else -> MusicController.playlists[d.title].orEmpty().mapNotNull { byId[it] }
           }
       }
@@ -368,7 +399,7 @@ object MusicScreen : Screen {
           searching = false
         },
         goArtist = {
-          detail = Detail.ArtistD(it.artist)
+          detail = Detail.ArtistD(if (MusicSettings.multiArtists) splitArtists(it.artist).first() else it.artist)
           showNow = false
           searching = false
         },
@@ -411,7 +442,7 @@ object MusicScreen : Screen {
                   modifier = Modifier.fillMaxWidth(),
                 )
               } else {
-                Text(text = if (showSettings) (musicSettingsTitles.getOrNull(settingsPage) ?: "Settings") else (detail?.title ?: "Music"), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(text = if (showSettings) "" else (detail?.title ?: "Music"), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
               }
             },
             navigationIcon = {
@@ -467,13 +498,15 @@ object MusicScreen : Screen {
             NavigationBar {
               val items =
                 listOf(
-                  "For you" to Icons.Filled.Home,
+                  "Home" to Icons.Filled.Home,
                   "Songs" to Icons.Filled.MusicNote,
                   "Albums" to Icons.Filled.Album,
                   "Artists" to Icons.Filled.Person,
                   "Playlists" to Icons.AutoMirrored.Filled.QueueMusic,
+                  "Folders" to Icons.Filled.Folder,
                 )
-              items.forEachIndexed { i, (label, icon) ->
+              MusicSettings.tabOrderList().forEach { i ->
+                val (label, icon) = items[i]
                 if (MusicSettings.isTabVisible(i)) {
                   val labelText: @Composable () -> Unit = { Text(label, maxLines = 1) }
                   NavigationBarItem(
@@ -501,6 +534,7 @@ object MusicScreen : Screen {
             showSettings ->
               MusicSettingsHost(
                 page = settingsPage,
+                tracks = tracks,
                 onPage = { settingsPage = it },
                 onScan = { scanPhone(); showSettings = false },
                 onClearHistory = {
@@ -584,6 +618,7 @@ object MusicScreen : Screen {
                   }
                 }
               }
+            tab == 5 -> FoldersTab(folders) { detail = Detail.FolderD(it.path, it.name) }
             else ->
               PlaylistsTab(
                 onOpen = { detail = it },
@@ -677,7 +712,7 @@ private fun HomeTab(
   onPlayTrack: (List<MusicTrack>, Int) -> Unit,
   onAlbum: (AlbumItem) -> Unit,
 ) {
-  val recent = remember(tracks) { tracks.sortedByDescending { it.dateAdded }.take(20) }
+  val recent = remember(tracks, MusicSettings.lastAddedDays) { lastAdded(tracks).take(20) }
   val played = MusicController.history.mapNotNull { byId[it] }.take(20)
   val randomAlbums = remember(albums) { albums.shuffled().take(20) }
   LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 12.dp)) {
@@ -708,7 +743,7 @@ private fun HomeTab(
       item { TrackRow(played) { i -> onPlayTrack(played, i) } }
     }
     if (MusicSettings.homeLastAdded) {
-      item { SectionTitle("Last added", "See all") { onOpen(Detail.ListD("Last added", "recent")) } }
+      item { SectionTitle("Last added", if (MusicSettings.seeAll) "See all" else null) { onOpen(Detail.ListD("Last added", "recent")) } }
       item { TrackRow(recent) { i -> onPlayTrack(recent, i) } }
     }
     if (randomAlbums.isNotEmpty() && MusicSettings.homeAlbums) {
@@ -914,7 +949,17 @@ private fun SongRow(
   val isCurrent = MusicController.current?.id == track.id
   val color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
   Row(
-    modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
+    modifier =
+      Modifier
+        .fillMaxWidth()
+        .then(
+          if (isCurrent) {
+            Modifier.background((accentPalette.getOrNull(MusicSettings.highlightIdx - 1) ?: MaterialTheme.colorScheme.primary).copy(alpha = MusicSettings.highlightAlpha / 100f))
+          } else {
+            Modifier
+          },
+        ).clickable(onClick = onClick)
+        .padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(14.dp),
   ) {
@@ -1035,6 +1080,11 @@ private fun NowPlaying(
   var showSpeed by remember { mutableStateOf(false) }
   var menu by remember { mutableStateOf(false) }
   var showLyrics by remember { mutableStateOf(false) }
+  val info by produceState("", t.id) { value = withContext(Dispatchers.IO) { loadSongInfo(context, t) } }
+  fun clock(ms: Long): String {
+    val sec = (ms / 1000).toInt().coerceAtLeast(0)
+    return "%02d:%02d".format(sec / 60, sec % 60)
+  }
   var showEditor by remember { mutableStateOf(false) }
 
   LaunchedEffect(MusicController.index, MusicController.isPlaying) {
@@ -1059,8 +1109,9 @@ private fun NowPlaying(
   val fav = t.id in MusicController.favorites
   val duration = t.durationMs.coerceAtLeast(1L).toFloat()
   val baseColor = solidSurface()
+  val useBlur = MusicSettings.nowPlayingBg == 3 || MusicSettings.nowPlayingBg == 4
   val blurBmp by produceState<Bitmap?>(null, t.id, MusicSettings.nowPlayingBg) {
-    value = if (MusicSettings.nowPlayingBg == 2) withContext(Dispatchers.IO) { loadArt(context, t, 256) } else null
+    value = if (useBlur) withContext(Dispatchers.IO) { loadArt(context, t, 256) } else null
   }
   val coverFraction =
     when (MusicSettings.coverSize) {
@@ -1072,7 +1123,7 @@ private fun NowPlaying(
   Surface(modifier = Modifier.fillMaxSize(), color = baseColor) {
     val artBg = blurBmp
     Box(modifier = Modifier.fillMaxSize()) {
-    if (MusicSettings.nowPlayingBg == 2 && artBg != null) {
+    if (useBlur && artBg != null) {
       Image(
         bitmap = artBg.asImageBitmap(),
         contentDescription = null,
@@ -1086,53 +1137,33 @@ private fun NowPlaying(
         Modifier
           .fillMaxSize()
           .then(
-            if (MusicSettings.nowPlayingBg == 0) {
-              Modifier.background(Brush.verticalGradient(listOf(animAccent.copy(alpha = 0.6f), baseColor)))
-            } else {
-              Modifier
+            when (MusicSettings.nowPlayingBg) {
+              1 -> Modifier.background(animAccent.copy(alpha = 0.75f).compositeOver(baseColor))
+              2, 4 -> Modifier.background(Brush.verticalGradient(listOf(animAccent.copy(alpha = 0.6f), baseColor)))
+              5 -> Modifier.background(Brush.radialGradient(listOf(animAccent.copy(alpha = 0.55f), baseColor), radius = 1100f))
+              6 -> Modifier.background(lerp(baseColor, MaterialTheme.colorScheme.primary, 0.25f))
+              else -> Modifier
             },
           )
+          .pointerInput(Unit) {
+            // swipe down to close Now playing
+            var dy = 0f
+            detectVerticalDragGestures(
+              onDragStart = { dy = 0f },
+              onDragEnd = { if (dy > 250f) onClose() },
+            ) { _, d -> dy += d }
+          }
           .statusBarsPadding()
           .navigationBarsPadding()
           .padding(horizontal = 24.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-      Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onClose) { Icon(Icons.Filled.KeyboardArrowDown, "Close") }
-        Text("Now playing", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        IconButton(onClick = { showLyrics = !showLyrics }) {
-          Icon(Icons.Filled.Subtitles, "Lyrics", tint = if (showLyrics) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
-        }
-        Box {
-          IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, "More") }
-          DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = popupColor()) {
-            @Composable
-            fun item(
-              label: String,
-              run: () -> Unit,
-            ) = DropdownMenuItem(text = { Text(label) }, onClick = { menu = false; run() })
-            item("Sleep timer") { showSleep = true }
-            item("Playback speed") { showSpeed = true }
-            item(if (showLyrics) "Show cover" else "Show lyrics") { showLyrics = !showLyrics }
-            item("Edit lyrics") { showEditor = true }
-            item("Equalizer") { openEqualizer(context) }
-            item("Add to playlist") { actions.addToPlaylist(t) }
-            item("Go to album") { actions.goAlbum(t) }
-            item("Go to artist") { actions.goArtist(t) }
-            item("Share") { actions.share(t) }
-            item("Details") { actions.info(t) }
-            item("Clear playing queue") { MusicController.clearQueue() }
-            item("Stop & close player") { MusicController.stopAll(); onClose() }
-          }
-        }
-      }
-
-      Spacer(Modifier.height(8.dp))
       Box(
         modifier =
           Modifier
             .fillMaxWidth()
             .weight(1f, fill = true)
+            .padding(top = 16.dp)
             .pointerInput(t.id) {
               var dx = 0f
               detectHorizontalDragGestures(
@@ -1161,21 +1192,30 @@ private fun NowPlaying(
           TrackArt(t, 800, Modifier.fillMaxWidth(coverFraction).aspectRatio(1f), RoundedCornerShape(28.dp))
         }
       }
-      Spacer(Modifier.height(16.dp))
+      Spacer(Modifier.height(20.dp))
 
-      Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Column(modifier = Modifier.weight(1f)) {
-          Text(t.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-          Text(t.artist, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        if (MusicSettings.showFavButton) IconButton(onClick = { MusicController.toggleFavorite(t.id) }) {
+      Text(t.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+      Text(t.artist, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+      Spacer(Modifier.height(24.dp))
+
+      Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+        IconButton(onClick = { MusicController.cycleRepeat() }) {
           Icon(
-            if (fav) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-            "Favorite",
-            tint = if (fav) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            if (MusicController.repeat == 2) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+            "Repeat",
+            tint = if (MusicController.repeat != 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
           )
         }
+        IconButton(onClick = { MusicController.previous() }, modifier = Modifier.size(56.dp)) { Icon(Icons.Filled.SkipPrevious, "Previous", Modifier.size(36.dp)) }
+        FilledIconButton(onClick = { MusicController.togglePlay() }, modifier = Modifier.size(88.dp)) {
+          Icon(if (MusicController.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, "Play/Pause", Modifier.size(44.dp))
+        }
+        IconButton(onClick = { MusicController.next() }, modifier = Modifier.size(56.dp)) { Icon(Icons.Filled.SkipNext, "Next", Modifier.size(36.dp)) }
+        IconButton(onClick = { MusicController.toggleShuffle() }) {
+          Icon(Icons.Filled.Shuffle, "Shuffle", tint = if (MusicController.shuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+        }
       }
+      Spacer(Modifier.height(20.dp))
 
       Slider(
         value = if (dragging) dragValue else (pos / duration).coerceIn(0f, 1f),
@@ -1189,39 +1229,72 @@ private fun NowPlaying(
           dragging = false
         },
       )
-      Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(formatTrackTime(if (dragging) (dragValue * duration).toLong() else pos.toLong()), style = MaterialTheme.typography.bodySmall)
-        Text(formatTrackTime(t.durationMs), style = MaterialTheme.typography.bodySmall)
+      Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(clock(if (dragging) (dragValue * duration).toLong() else pos.toLong()), style = MaterialTheme.typography.bodySmall)
+        Text(if (MusicSettings.remainingTime) "-" + clock((t.durationMs - (if (dragging) (dragValue * duration).toLong() else pos.toLong())).coerceAtLeast(0L)) else clock(t.durationMs), style = MaterialTheme.typography.bodySmall)
       }
+      Spacer(Modifier.height(20.dp))
+      if (MusicSettings.songInfo) Text(info, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().heightIn(min = 18.dp))
+      Spacer(Modifier.height(20.dp))
 
-      Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        IconButton(onClick = { MusicController.toggleShuffle() }) {
-          Icon(Icons.Filled.Shuffle, "Shuffle", tint = if (MusicController.shuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
-        }
-        IconButton(onClick = { MusicController.previous() }, modifier = Modifier.size(56.dp)) { Icon(Icons.Filled.SkipPrevious, "Previous", Modifier.size(36.dp)) }
-        FilledIconButton(onClick = { MusicController.togglePlay() }, modifier = Modifier.size(72.dp)) {
-          Icon(if (MusicController.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, "Play/Pause", Modifier.size(40.dp))
-        }
-        IconButton(onClick = { MusicController.next() }, modifier = Modifier.size(56.dp)) { Icon(Icons.Filled.SkipNext, "Next", Modifier.size(36.dp)) }
-        IconButton(onClick = { MusicController.cycleRepeat() }) {
-          Icon(
-            if (MusicController.repeat == 2) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
-            "Repeat",
-            tint = if (MusicController.repeat != 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+      if (MusicSettings.volumeSlider) {
+        val am = remember { context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager }
+        val maxV = remember { am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC).coerceAtLeast(1).toFloat() }
+        var vol by remember { mutableFloatStateOf(am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC).toFloat()) }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+          Icon(Icons.AutoMirrored.Filled.VolumeUp, "Volume")
+          Slider(
+            value = vol,
+            onValueChange = {
+              vol = it
+              am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, it.toInt(), 0)
+            },
+            valueRange = 0f..maxV,
+            modifier = Modifier.weight(1f).padding(start = 8.dp),
           )
         }
       }
-
-      if (MusicSettings.showExtraControls) Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-        IconButton(onClick = { showQueue = true }) { Icon(Icons.AutoMirrored.Filled.QueueMusic, "Queue") }
-        IconButton(onClick = { showSleep = true }) {
-          Icon(Icons.Filled.Timer, "Sleep timer", tint = if (MusicController.sleepEndAt > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+      Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = { showLyrics = !showLyrics }) {
+          Icon(if (showLyrics) Icons.Filled.SpeakerNotesOff else Icons.Filled.SpeakerNotes, "Lyrics")
         }
-        IconButton(onClick = { showSpeed = true }) {
-          Icon(Icons.Filled.Speed, "Speed", tint = if (MusicController.speed != 1f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+        if (MusicSettings.showFavButton) {
+          IconButton(onClick = { MusicController.toggleFavorite(t.id) }) {
+            Icon(
+              if (fav) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+              "Favorite",
+              tint = if (fav) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            )
+          }
         }
-        IconButton(onClick = { openEqualizer(context) }) { Icon(Icons.Filled.Equalizer, "Equalizer") }
-        IconButton(onClick = { actions.info(t) }) { Icon(Icons.Filled.Info, "Details") }
+        if (MusicSettings.showExtraControls) {
+          IconButton(onClick = { showSleep = true }) {
+            Icon(Icons.Filled.Bedtime, "Sleep timer", tint = if (MusicController.sleepEndAt > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+          }
+          IconButton(onClick = { showQueue = true }) { Icon(Icons.AutoMirrored.Filled.QueueMusic, "Queue") }
+        }
+        Box {
+          IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreHoriz, "More") }
+          DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = popupColor()) {
+            @Composable
+            fun item(
+              label: String,
+              run: () -> Unit,
+            ) = DropdownMenuItem(text = { Text(label) }, onClick = { menu = false; run() })
+            item("Sleep timer") { showSleep = true }
+            item("Playback speed") { showSpeed = true }
+            item("Equalizer") { openEqualizer(context) }
+            item("Edit lyrics") { showEditor = true }
+            item("Add to playlist") { actions.addToPlaylist(t) }
+            item("Go to album") { actions.goAlbum(t) }
+            item("Go to artist") { actions.goArtist(t) }
+            item("Share") { actions.share(t) }
+            item("Details") { actions.info(t) }
+            item("Show queue") { showQueue = true }
+            item("Clear playing queue") { MusicController.clearQueue() }
+            item("Stop & close player") { MusicController.stopAll(); onClose() }
+          }
+        }
       }
     }
     }
@@ -1336,11 +1409,53 @@ private fun buildAlbums(tracks: List<MusicTrack>): List<AlbumItem> =
     .map { (k, v) -> AlbumItem(k, v.first().album, v.first().artist, v.sortedBy { it.title.lowercase() }) }
     .sortedBy { it.name.lowercase() }
 
+private fun splitArtists(a: String): List<String> {
+  if (!MusicSettings.multiArtists) return listOf(a)
+  val parts = a.split(*MusicSettings.artistSeparators.toCharArray()).map { it.trim() }.filter { it.isNotEmpty() }
+  return parts.ifEmpty { listOf(a) }
+}
+
 private fun buildArtists(tracks: List<MusicTrack>): List<ArtistItem> =
   tracks
-    .groupBy { it.artist }
+    .flatMap { t -> splitArtists(t.artist).map { it to t } }
+    .groupBy({ it.first }, { it.second })
     .map { (name, v) -> ArtistItem(name, v, v.map { it.albumId }.distinct().size) }
     .sortedBy { it.name.lowercase() }
+
+private fun lastAdded(tracks: List<MusicTrack>): List<MusicTrack> {
+  val d = MusicSettings.lastAddedDays
+  val cutoff = if (d > 0) System.currentTimeMillis() / 1000 - d * 86400L else 0L
+  return tracks.filter { it.dateAdded >= cutoff }.sortedByDescending { it.dateAdded }
+}
+
+@Composable
+private fun FoldersTab(
+  folders: List<FolderItem>,
+  onOpen: (FolderItem) -> Unit,
+) {
+  if (folders.isEmpty()) {
+    Text("No folders found", color = MaterialTheme.colorScheme.outline)
+    return
+  }
+  LazyColumn(modifier = Modifier.fillMaxSize()) {
+    items(folders, key = { it.path }) { f ->
+      Row(
+        modifier = Modifier.fillMaxWidth().clickable { onOpen(f) }.padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+      ) {
+        Box(
+          modifier = Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.secondaryContainer),
+          contentAlignment = Alignment.Center,
+        ) { Icon(Icons.Filled.Folder, null, tint = MaterialTheme.colorScheme.onSecondaryContainer) }
+        Column(modifier = Modifier.weight(1f)) {
+          Text(f.name, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+          Text("${f.tracks.size} songs  •  ${f.path}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+      }
+    }
+  }
+}
 
 private fun shareTrack(
   context: Context,

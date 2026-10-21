@@ -1,70 +1,131 @@
 package app.marlboroadvance.mpvex.ui.browser.music
 
 import android.net.Uri
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.PlayCircleOutline
-import androidx.compose.material.icons.filled.Restore
-import androidx.compose.material.icons.filled.ToggleOn
-import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.json.JSONObject
 
 // ---------------------------------------------------------------------------------------------
-// Theme helpers for the music screens
+// Colours
 // ---------------------------------------------------------------------------------------------
+
+internal val accentPalette: List<Color> =
+  listOf(
+    0xFF2196F3, 0xFF03A9F4, 0xFF00BCD4, 0xFF009688, 0xFF4CAF50, 0xFFCDDC39, 0xFFFFC107,
+    0xFFFF9800, 0xFFFF5722, 0xFFF44336, 0xFFE91E63, 0xFF9C27B0, 0xFF673AB7, 0xFF3F51B5,
+  ).map { Color(it) }
+
+internal val themeSeeds: List<Color> =
+  listOf(
+    0xFF9CC2FF, 0xFF7ED3E8, 0xFF8ED8B0, 0xFFE6C86B, 0xFFF2A07B, 0xFFF29DB8, 0xFFC7A8F0, 0xFFB4BCC8,
+  ).map { Color(it) }
 
 private fun Color.withMinAlpha(a: Float): Color = if (alpha < a) copy(alpha = a) else this
 
+private fun tinted(
+  cs: ColorScheme,
+  seed: Color,
+  setContainers: Boolean,
+): ColorScheme {
+  val base = cs.surface.copy(alpha = 1f)
+  val onSeed = if (seed.luminance() > 0.5f) Color.Black else Color.White
+  return if (setContainers) {
+    cs.copy(
+      primary = seed,
+      onPrimary = onSeed,
+      primaryContainer = lerp(base, seed, 0.30f),
+      onPrimaryContainer = cs.onSurface,
+      secondaryContainer = lerp(base, seed, 0.22f),
+      onSecondaryContainer = cs.onSurface,
+      surfaceTint = seed,
+    )
+  } else {
+    cs.copy(primary = seed, onPrimary = onSeed, surfaceTint = seed)
+  }
+}
+
 /**
- * When the app uses a see-through custom theme, cards, bars and panels can become invisible.
- * This keeps them at least as solid as the "Card & bar opacity" music setting.
+ * Applies the music theme options (light/dark, Material You, colour theme, extra dark, accent) and keeps
+ * cards, bars and panels visible when the app uses a see-through custom theme.
  */
 @Composable
 internal fun MusicPanelTheme(content: @Composable () -> Unit) {
-  val cs: ColorScheme = MaterialTheme.colorScheme
+  val context = LocalContext.current
+  val sysDark = isSystemInDarkTheme()
+  val appCs = MaterialTheme.colorScheme
+  var cs: ColorScheme =
+    when {
+      MusicSettings.materialYou && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+        val dark =
+          when (MusicSettings.themeMode) {
+            1 -> false
+            2 -> true
+            else -> sysDark
+          }
+        if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+      }
+      MusicSettings.themeMode == 1 -> lightColorScheme()
+      MusicSettings.themeMode == 2 -> darkColorScheme()
+      else -> appCs
+    }
+  val isDark = cs.onSurface.luminance() > 0.5f
+  if (MusicSettings.extraDark && isDark) {
+    cs =
+      cs.copy(
+        background = Color.Black,
+        surface = Color.Black,
+        surfaceContainerLowest = Color.Black,
+        surfaceContainerLow = Color(0xFF080808),
+        surfaceContainer = Color(0xFF0D0D0D),
+        surfaceContainerHigh = Color(0xFF141414),
+        surfaceContainerHighest = Color(0xFF1C1C1C),
+      )
+  }
+  val seed = themeSeeds.getOrNull(MusicSettings.themeSeed - 1)
+  if (seed != null && !(MusicSettings.materialYou && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)) cs = tinted(cs, seed, true)
+  val accent = accentPalette.getOrNull(MusicSettings.accentIdx - 1)
+  if (accent != null) cs = tinted(cs, accent, false)
+
   if (cs.surface.alpha >= 0.99f) {
-    content()
+    MaterialTheme(colorScheme = cs, content = content)
   } else {
     val floor = (MusicSettings.panelOpacity / 100f).coerceIn(0f, 1f)
     val accentFloor = maxOf(floor, 0.75f)
@@ -83,15 +144,6 @@ internal fun MusicPanelTheme(content: @Composable () -> Unit) {
   }
 }
 
-/** Background for menus, dialogs and sheets: always solid so the text stays readable. */
-@Composable
-internal fun popupColor(): Color {
-  val cs = MaterialTheme.colorScheme
-  val c = cs.surfaceContainerHigh
-  if (c.alpha >= 0.99f) return c
-  return lerp(solidSurface(), cs.primary, 0.10f)
-}
-
 /** A solid colour for full-screen layers such as Now playing (never see-through). */
 @Composable
 internal fun solidSurface(): Color {
@@ -103,34 +155,38 @@ internal fun solidSurface(): Color {
   return lerp(base, cs.primary, 0.08f)
 }
 
+/** Background for menus, dialogs and sheets: always solid so the text stays readable. */
+@Composable
+internal fun popupColor(): Color {
+  val cs = MaterialTheme.colorScheme
+  val c = cs.surfaceContainerHigh
+  if (c.alpha >= 0.99f) return c
+  return lerp(solidSurface(), cs.primary, 0.10f)
+}
+
 // ---------------------------------------------------------------------------------------------
-// Settings hub + pages (same groups as Retro Music Player)
+// Hub + host
 // ---------------------------------------------------------------------------------------------
 
-internal val musicSettingsTitles =
-  listOf("Look and feel", "Now playing", "Audio", "Personalize", "Images", "Other", "Backup & Restore", "About")
+internal val musicSettingsTitles = listOf("Themes & Colors", "Now playing", "Library", "Images", "Audio", "Playlists")
 
 private class HubItem(
   val title: String,
   val subtitle: String,
   val icon: ImageVector,
-  val circle: Color,
-  val tint: Color,
 )
 
 private val hubItems =
   listOf(
-    HubItem("Look and feel", "Change the theme and colors of the app", Icons.Filled.Palette, Color(0xFF1A2B52), Color(0xFF2F6FE0)),
-    HubItem("Now playing", "Customize the now playing screen", Icons.Filled.PlayCircleOutline, Color(0xFF4A0F34), Color(0xFFE0197D)),
-    HubItem("Audio", "Change the sound settings and adjust the equalizer controls", Icons.AutoMirrored.Filled.VolumeUp, Color(0xFF1A1B5A), Color(0xFF3C4AE0)),
-    HubItem("Personalize", "Customize your now playing and UI controls", Icons.Filled.ToggleOn, Color(0xFF0E4A4A), Color(0xFF00BFA5)),
-    HubItem("Images", "Change album art and cover settings", Icons.Filled.Image, Color(0xFF4A1A24), Color(0xFFE0334D)),
-    HubItem("Other", "Advanced testing features", Icons.Filled.Category, Color(0xFF14275A), Color(0xFF2F5FE0)),
-    HubItem("Backup & Restore", "Backup and restore your settings, playlists", Icons.Filled.Restore, Color(0xFF1F4050), Color(0xFF3AA0D0)),
-    HubItem("About", "Version and info", Icons.Filled.Info, Color(0xFF1F4A2C), Color(0xFF3DD16F)),
+    HubItem("Themes & Colors", "Change theme, accent color and highlight color", Icons.Filled.Palette),
+    HubItem("Now playing", "Themes, extra controls, display content, lockscreen", Icons.Filled.PlayArrow),
+    HubItem("Library", "Multiple artists, filters, navigation", Icons.Filled.Category),
+    HubItem("Images", "Image caching, artwork, lockscreen art", Icons.Filled.Image),
+    HubItem("Audio", "Fade audio, focus, auto play and more", Icons.Filled.MusicNote),
+    HubItem("Playlists", "Last added interval, backup, import and export", Icons.AutoMirrored.Filled.QueueMusic),
   )
 
-private fun msSave(block: () -> Unit) {
+private fun upd(block: () -> Unit) {
   block()
   MusicSettings.save()
 }
@@ -139,39 +195,44 @@ private fun msSave(block: () -> Unit) {
 internal fun MusicSettingsHost(
   page: Int,
   onPage: (Int) -> Unit,
+  tracks: List<MusicTrack>,
   onScan: () -> Unit,
   onClearHistory: () -> Unit,
 ) {
   when (page) {
-    0 -> LookAndFeelPage()
+    0 -> ThemesPage()
     1 -> NowPlayingPage()
-    2 -> AudioPage()
-    3 -> PersonalizePage()
-    4 -> ImagesPage()
-    5 -> OtherPage(onScan, onClearHistory)
-    6 -> BackupPage()
-    7 -> AboutPage()
+    2 -> LibraryPage(tracks, onScan, onClearHistory)
+    3 -> ImagesPage()
+    4 -> AudioPage()
+    5 -> PlaylistsPage()
     else -> SettingsHub(onPage)
   }
 }
 
 @Composable
 private fun SettingsHub(onPage: (Int) -> Unit) {
-  LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 12.dp)) {
-    hubItems.forEachIndexed { i, h ->
-      item {
-        Row(
-          modifier = Modifier.fillMaxWidth().clickable { onPage(i) }.padding(horizontal = 16.dp, vertical = 12.dp),
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(18.dp),
-        ) {
-          Box(
-            modifier = Modifier.size(62.dp).clip(CircleShape).background(h.circle),
-            contentAlignment = Alignment.Center,
-          ) { Icon(h.icon, null, tint = h.tint, modifier = Modifier.size(28.dp)) }
-          Column(modifier = Modifier.weight(1f)) {
-            Text(h.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-            Text(h.subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+  LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
+    item { PageTitle("Settings") }
+    item {
+      Surface(
+        shape = RoundedCornerShape(32.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+      ) {
+        Column {
+          hubItems.forEachIndexed { i, h ->
+            Row(
+              modifier = Modifier.fillMaxWidth().clickable { onPage(i) }.padding(horizontal = 24.dp, vertical = 26.dp),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(28.dp),
+            ) {
+              Icon(h.icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(34.dp))
+              Column(modifier = Modifier.weight(1f)) {
+                Text(h.title, style = MaterialTheme.typography.titleLarge)
+                Text(h.subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+              }
+            }
           }
         }
       }
@@ -180,163 +241,347 @@ private fun SettingsHub(onPage: (Int) -> Unit) {
 }
 
 @Composable
-private fun PageList(content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
-  LazyColumn(
-    modifier = Modifier.fillMaxSize(),
-    contentPadding = PaddingValues(bottom = 24.dp),
-    content = content,
-  )
+private fun PageTitle(text: String) {
+  Text(text, style = MaterialTheme.typography.displaySmall, modifier = Modifier.padding(start = 24.dp, top = 40.dp, bottom = 28.dp))
 }
 
-// ---- Look and feel ----
-
 @Composable
-private fun LookAndFeelPage() {
-  PageList {
-    item { MsHeader("Theme") }
-    item {
-      MsNote("App theme, accent colour and the custom background picture are set in the main app Settings (Customize theme). Music uses them automatically.")
-    }
-    item {
-      MsSlider("Card & bar opacity", MusicSettings.panelOpacity, 0..100, "%", "Keeps cards, bars and panels visible when the custom theme transparency is high") {
-        MusicSettings.panelOpacity = it
-      }
-    }
-    item { MsHeader("Start screen") }
-    item {
-      MsChoice("Open music on", listOf("Last used tab", "Fixed tab"), MusicSettings.openMode) { msSave { MusicSettings.openMode = it } }
-    }
-    if (MusicSettings.openMode == 1) {
-      item {
-        MsChoice("Fixed tab", listOf("For you", "Songs", "Albums", "Artists", "Playlists"), MusicSettings.defaultTab) {
-          msSave { MusicSettings.defaultTab = it }
-        }
-      }
-    }
-    item { MsHeader("Bottom bar") }
-    item {
-      MsChoice("Tab labels", listOf("Always", "Selected only", "Hidden"), MusicSettings.tabLabels) { msSave { MusicSettings.tabLabels = it } }
-    }
-    item { MsHeader("Lists") }
-    item { MsSwitch("Show song duration", MusicSettings.showSongDuration) { msSave { MusicSettings.showSongDuration = it } } }
-    item { MsHeader("For you page") }
-    item { MsSwitch("Recently played", MusicSettings.homeRecent) { msSave { MusicSettings.homeRecent = it } } }
-    item { MsSwitch("Last added", MusicSettings.homeLastAdded) { msSave { MusicSettings.homeLastAdded = it } } }
-    item { MsSwitch("Albums", MusicSettings.homeAlbums) { msSave { MusicSettings.homeAlbums = it } } }
+private fun OtoPage(
+  title: String,
+  content: LazyListScope.() -> Unit,
+) {
+  LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
+    item { PageTitle(title) }
+    content()
   }
 }
 
-// ---- Now playing ----
+// ---------------------------------------------------------------------------------------------
+// Themes & Colors
+// ---------------------------------------------------------------------------------------------
+
+@Composable
+private fun ThemesPage() {
+  var accentDialog by remember { mutableStateOf(false) }
+  var highlightDialog by remember { mutableStateOf(false) }
+  OtoPage("Themes & Colors") {
+    item {
+      Row(modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp), horizontalArrangement = Arrangement.Center) {
+        Row(modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFE2E2E6)).padding(6.dp)) {
+          listOf("Light" to 1, "Dark" to 2, "System" to 0).forEach { (label, mode) ->
+            val sel = MusicSettings.themeMode == mode
+            Box(
+              modifier =
+                Modifier
+                  .clip(RoundedCornerShape(50))
+                  .background(if (sel) Color.Black else Color.Transparent)
+                  .clickable { upd { MusicSettings.themeMode = mode } }
+                  .padding(horizontal = 26.dp, vertical = 16.dp),
+            ) { Text(label, color = if (sel) Color.White else Color.Black, fontWeight = FontWeight.Medium) }
+          }
+        }
+      }
+    }
+    item {
+      OtoSwitch("Material You themes", "Use your phone's wallpaper colors (Android 12 or newer).", MusicSettings.materialYou, Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        upd { MusicSettings.materialYou = it }
+      }
+    }
+    item {
+      LazyRow(contentPadding = PaddingValues(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(vertical = 12.dp)) {
+        itemsIndexed((0..8).toList()) { _, idx ->
+          val seed = themeSeeds.getOrNull(idx - 1) ?: MaterialTheme.colorScheme.primary
+          val sel = MusicSettings.themeSeed == idx
+          Box(
+            modifier =
+              Modifier
+                .size(104.dp)
+                .clip(RoundedCornerShape(26.dp))
+                .background(Color(0xFF0A1018))
+                .then(if (sel) Modifier.border(3.dp, seed, RoundedCornerShape(26.dp)) else Modifier)
+                .clickable { upd { MusicSettings.themeSeed = idx } },
+            contentAlignment = Alignment.Center,
+          ) {
+            Canvas(modifier = Modifier.size(76.dp)) {
+              val bottom = lerp(seed, Color(0xFFD7A8E0), 0.6f)
+              drawArc(seed, 180f, 180f, true, Offset.Zero, Size(size.width, size.height))
+              drawArc(bottom, 0f, 180f, true, Offset.Zero, Size(size.width, size.height))
+              drawCircle(Color(0xFF0A2540), radius = size.minDimension * 0.31f)
+            }
+          }
+        }
+      }
+    }
+    item {
+      OtoSwitch("Use extra dark colors", "Use darker colors for small battery savings on AMOLED screens.", MusicSettings.extraDark) {
+        upd { MusicSettings.extraDark = it }
+      }
+    }
+    item {
+      OtoRow("Accent color", "Used to emphasize select parts of the UI.", true, { accentDialog = true }) {
+        ColorDot(accentPalette.getOrNull(MusicSettings.accentIdx - 1) ?: MaterialTheme.colorScheme.primary)
+      }
+    }
+    item {
+      OtoRow("Highlight color", "Used to highlight the current playing song.", true, { highlightDialog = true }) {
+        ColorDot(accentPalette.getOrNull(MusicSettings.highlightIdx - 1) ?: MaterialTheme.colorScheme.primary)
+      }
+    }
+    item {
+      OtoSlider("Highlight color alpha", "Set highlight color transparency", MusicSettings.highlightAlpha, 0..100) { upd { MusicSettings.highlightAlpha = it } }
+    }
+    item {
+      OtoSlider(
+        "Card & bar opacity",
+        "Keeps cards, bars and panels visible when your custom app theme is very transparent",
+        MusicSettings.panelOpacity,
+        0..100,
+      ) { upd { MusicSettings.panelOpacity = it } }
+    }
+  }
+  if (accentDialog) ColorDialog("Accent color", MusicSettings.accentIdx, { upd { MusicSettings.accentIdx = it } }) { accentDialog = false }
+  if (highlightDialog) ColorDialog("Highlight color", MusicSettings.highlightIdx, { upd { MusicSettings.highlightIdx = it } }) { highlightDialog = false }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Now playing
+// ---------------------------------------------------------------------------------------------
 
 @Composable
 private fun NowPlayingPage() {
-  PageList {
-    item { MsHeader("Appearance") }
+  OtoPage("Now playing") {
     item {
-      MsChoice("Background", listOf("Album color", "Plain", "Blurred cover"), MusicSettings.nowPlayingBg) {
-        msSave { MusicSettings.nowPlayingBg = it }
+      OtoChoice("Now Playing Theme", listOf("Default", "Colored", "Gradient", "Blur", "Gradient Blur", "Glow", "Material You"), MusicSettings.nowPlayingBg) {
+        upd { MusicSettings.nowPlayingBg = it }
       }
     }
-    if (MusicSettings.nowPlayingBg == 2) {
-      item {
-        MsSlider("Blur amount", MusicSettings.blurAmount, 5..100, "", "Needs Android 12 or newer to blur") {
-          MusicSettings.blurAmount = it
-        }
+    if (MusicSettings.nowPlayingBg == 3 || MusicSettings.nowPlayingBg == 4) {
+      item { OtoSlider("Blur amount", "Needs Android 12 or newer to blur", MusicSettings.blurAmount, 5..100) { upd { MusicSettings.blurAmount = it } } }
+    }
+    item {
+      OtoSwitch("Show song info", "Show song information such as file format, bitrate and frequency in the main player", MusicSettings.songInfo) {
+        upd { MusicSettings.songInfo = it }
       }
     }
     item {
-      MsChoice("Cover size", listOf("Large", "Medium", "Small"), MusicSettings.coverSize) { msSave { MusicSettings.coverSize = it } }
+      OtoSwitch("Extra controls", "Add previous and forward button in the mini player", MusicSettings.miniControls == 2) {
+        upd { MusicSettings.miniControls = if (it) 2 else 0 }
+      }
     }
-    item { MsHeader("Controls") }
-    item { MsSwitch("Swipe cover to change song", MusicSettings.swipeCover) { msSave { MusicSettings.swipeCover = it } } }
-    item { MsSwitch("Show favorite button", MusicSettings.showFavButton) { msSave { MusicSettings.showFavButton = it } } }
-    item { MsSwitch("Show extra controls (queue, timer, speed, equalizer)", MusicSettings.showExtraControls) { msSave { MusicSettings.showExtraControls = it } } }
-    item { MsHeader("Lyrics") }
-    item { MsSwitch("Search lyrics on the web automatically", MusicSettings.lyricsAuto) { msSave { MusicSettings.lyricsAuto = it } } }
-    item { MsNote("Tap the lyrics button in Now playing. Synced lyrics scroll with the song, and found lyrics are saved on your phone. You can also edit or paste your own.") }
-    item { MsHeader("Behavior") }
-    item { MsSwitch("Open Now playing when a song starts", MusicSettings.openNowOnPlay) { msSave { MusicSettings.openNowOnPlay = it } } }
-    item { MsSwitch("Keep screen on in Now playing", MusicSettings.keepScreenOn) { msSave { MusicSettings.keepScreenOn = it } } }
+    item {
+      OtoSwitch("Show remaining time", "Show remaining time instead of duration in the main player", MusicSettings.remainingTime) {
+        upd { MusicSettings.remainingTime = it }
+      }
+    }
+    item {
+      OtoSwitch("Show volume slider", "Show volume slider in the main player", MusicSettings.volumeSlider) { upd { MusicSettings.volumeSlider = it } }
+    }
+    item { OtoHeader("Lyrics") }
+    item {
+      OtoSwitch("Search lyrics online", "Find and save lyrics from the web when a song has none", MusicSettings.lyricsAuto) { upd { MusicSettings.lyricsAuto = it } }
+    }
+    item { OtoHeader("More") }
+    item { OtoChoice("Cover size", listOf("Large", "Medium", "Small"), MusicSettings.coverSize) { upd { MusicSettings.coverSize = it } } }
+    item { OtoSwitch("Swipe cover to change song", null, MusicSettings.swipeCover) { upd { MusicSettings.swipeCover = it } } }
+    item { OtoSwitch("Show favorite button", null, MusicSettings.showFavButton) { upd { MusicSettings.showFavButton = it } } }
+    item { OtoSwitch("Show sleep timer and queue buttons", null, MusicSettings.showExtraControls) { upd { MusicSettings.showExtraControls = it } } }
+    item { OtoSwitch("Open Now playing when a song starts", null, MusicSettings.openNowOnPlay) { upd { MusicSettings.openNowOnPlay = it } } }
+    item { OtoSwitch("Keep screen on", "While Now playing is open", MusicSettings.keepScreenOn) { upd { MusicSettings.keepScreenOn = it } } }
   }
 }
 
-// ---- Audio ----
+// ---------------------------------------------------------------------------------------------
+// Library
+// ---------------------------------------------------------------------------------------------
+
+private val tabNames = listOf("Home", "Songs", "Albums", "Artists", "Playlists", "Folders")
+
+@Composable
+private fun LibraryPage(
+  tracks: List<MusicTrack>,
+  onScan: () -> Unit,
+  onClearHistory: () -> Unit,
+) {
+  var tabsDialog by remember { mutableStateOf(false) }
+  var blacklistDialog by remember { mutableStateOf(false) }
+  var symbolsDialog by remember { mutableStateOf(false) }
+  OtoPage("Library") {
+    item { OtoRow("Manage bottom tabs", "Reorder and set visibility of bottom tabs", true, { tabsDialog = true }) }
+    item { OtoSwitch("Show See all button", "Show or hide See all button in details page.", MusicSettings.seeAll) { upd { MusicSettings.seeAll = it } } }
+    item { OtoHeader("Multiple artists") }
+    item {
+      OtoSwitch("Multiple artists support", "Split artist tags with (, & ;) separators.", MusicSettings.multiArtists) { upd { MusicSettings.multiArtists = it } }
+    }
+    item {
+      OtoRow("Symbols to split artists", "Add separators based on which artists will be split (now: ${MusicSettings.artistSeparators})", MusicSettings.multiArtists, { symbolsDialog = true })
+    }
+    item { OtoHeader("Filter") }
+    item {
+      OtoRow("Blacklist", "Hide folders from the library (${MusicSettings.excluded().size} hidden)", true, { blacklistDialog = true })
+    }
+    item {
+      val values = listOf(0, 10, 30, 60)
+      OtoChoice("Hide songs shorter than", listOf("Off", "10 sec", "30 sec", "60 sec"), values.indexOf(MusicSettings.minDurationSec).coerceAtLeast(0)) {
+        upd { MusicSettings.minDurationSec = values[it] }
+      }
+    }
+    item { OtoHeader("Navigation") }
+    item { OtoChoice("Open music on", listOf("Last used tab", "Fixed tab"), MusicSettings.openMode) { upd { MusicSettings.openMode = it } } }
+    if (MusicSettings.openMode == 1) {
+      item { OtoChoice("Fixed tab", tabNames, MusicSettings.defaultTab.coerceIn(0, 5)) { upd { MusicSettings.defaultTab = it } } }
+    }
+    item { OtoChoice("Tab labels", listOf("Always", "Selected only", "Hidden"), MusicSettings.tabLabels) { upd { MusicSettings.tabLabels = it } } }
+    item { OtoSwitch("Show song duration", "In song lists", MusicSettings.showSongDuration) { upd { MusicSettings.showSongDuration = it } } }
+    item { OtoHeader("Home page") }
+    item { OtoSwitch("Recently played", null, MusicSettings.homeRecent) { upd { MusicSettings.homeRecent = it } } }
+    item { OtoSwitch("Last added", null, MusicSettings.homeLastAdded) { upd { MusicSettings.homeLastAdded = it } } }
+    item { OtoSwitch("Albums", null, MusicSettings.homeAlbums) { upd { MusicSettings.homeAlbums = it } } }
+    item { OtoHeader("Library tools") }
+    item { OtoRow("Scan phone for new music", "Look for songs added recently", true, onScan) }
+    item { OtoRow("Clear history", "Remove the recently played list", true, onClearHistory) }
+    item { OtoRow("Reset all music settings", "Go back to the default options", true, { MusicSettings.reset() }) }
+  }
+  if (tabsDialog) TabsDialog { tabsDialog = false }
+  if (blacklistDialog) BlacklistDialog(tracks) { blacklistDialog = false }
+  if (symbolsDialog) {
+    var text by remember { mutableStateOf(MusicSettings.artistSeparators) }
+    AlertDialog(
+      containerColor = popupColor(),
+      onDismissRequest = { symbolsDialog = false },
+      title = { Text("Symbols to split artists") },
+      text = { OutlinedTextField(value = text, onValueChange = { text = it }, singleLine = true, label = { Text("For example , & ;") }) },
+      confirmButton = {
+        TextButton(onClick = { upd { MusicSettings.artistSeparators = text.replace(" ", "").ifEmpty { ",&;" } }; symbolsDialog = false }) { Text("Save") }
+      },
+      dismissButton = { TextButton(onClick = { symbolsDialog = false }) { Text("Cancel") } },
+    )
+  }
+}
+
+@Composable
+private fun TabsDialog(onDismiss: () -> Unit) {
+  val order = remember { mutableStateListOf<Int>().apply { addAll(MusicSettings.tabOrderList()) } }
+  var mask by remember { mutableIntStateOf(MusicSettings.tabsMask) }
+  AlertDialog(
+    containerColor = popupColor(),
+    onDismissRequest = onDismiss,
+    title = { Text("Manage bottom tabs") },
+    text = {
+      Column {
+        order.forEachIndexed { pos, tab ->
+          Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Checkbox(
+              checked = (mask and (1 shl tab)) != 0,
+              onCheckedChange = {
+                val next = if (it) mask or (1 shl tab) else mask and (1 shl tab).inv()
+                if (next and 63 != 0) mask = next and 63
+              },
+            )
+            Text(tabNames[tab], modifier = Modifier.weight(1f))
+            IconButton(enabled = pos > 0, onClick = { order.add(pos - 1, order.removeAt(pos)) }) { Icon(Icons.Filled.KeyboardArrowUp, "Move up") }
+            IconButton(enabled = pos < order.lastIndex, onClick = { order.add(pos + 1, order.removeAt(pos)) }) { Icon(Icons.Filled.KeyboardArrowDown, "Move down") }
+          }
+        }
+      }
+    },
+    confirmButton = {
+      Button(
+        onClick = {
+          upd {
+            MusicSettings.tabOrder = order.joinToString(",")
+            MusicSettings.tabsMask = mask
+          }
+          onDismiss()
+        },
+      ) { Text("Save") }
+    },
+    dismissButton = { OutlinedButton(onClick = onDismiss) { Text("Cancel") } },
+  )
+}
+
+@Composable
+private fun BlacklistDialog(
+  tracks: List<MusicTrack>,
+  onDismiss: () -> Unit,
+) {
+  val excluded = MusicSettings.excluded()
+  val folders = (tracks.mapNotNull { t -> t.path.substringBeforeLast('/', "").takeIf { it.isNotEmpty() } } + excluded).distinct().sorted()
+  AlertDialog(
+    containerColor = popupColor(),
+    onDismissRequest = onDismiss,
+    title = { Text("Blacklist") },
+    text = {
+      if (folders.isEmpty()) {
+        Text("No folders found")
+      } else {
+        LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
+          itemsIndexed(folders) { _, f ->
+            val hidden = f in excluded
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              modifier =
+                Modifier.fillMaxWidth().clickable {
+                  val next = if (hidden) excluded - f else excluded + f
+                  upd { MusicSettings.excludedFolders = next.joinToString("|") }
+                },
+            ) {
+              Checkbox(checked = hidden, onCheckedChange = null)
+              Spacer(Modifier.width(8.dp))
+              Text(f, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(vertical = 8.dp))
+            }
+          }
+        }
+      }
+    },
+    confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+  )
+}
+
+// ---------------------------------------------------------------------------------------------
+// Images
+// ---------------------------------------------------------------------------------------------
+
+@Composable
+private fun ImagesPage() {
+  OtoPage("Images") {
+    item { OtoSwitch("Cache images", "Faster loading of images but will increase app size due to caching.", MusicSettings.cacheImages) { upd { MusicSettings.cacheImages = it } } }
+    item { OtoHeader("Metadata") }
+    item {
+      OtoSwitch("Use MediaStore provided artworks", "Faster artwork loading time, but can show incorrect artwork", MusicSettings.useMediaStoreArt) {
+        upd { MusicSettings.useMediaStoreArt = it }
+      }
+    }
+    item { OtoHeader("Lockscreen") }
+    item { OtoSwitch("Lockscreen album art", "Show album art on the lockscreen", MusicSettings.lockArt) { upd { MusicSettings.lockArt = it } } }
+    item { OtoSwitch("Blur album cover", "Blur album art on the lockscreen", MusicSettings.lockBlur, MusicSettings.lockArt) { upd { MusicSettings.lockBlur = it } } }
+    item { OtoHeader("Appearance") }
+    item { OtoChoice("Cover shape", listOf("Rounded", "Circle", "Square"), MusicSettings.coverShape) { upd { MusicSettings.coverShape = it } } }
+    item { OtoSwitch("Show album art in song lists", null, MusicSettings.showSongArt) { upd { MusicSettings.showSongArt = it } } }
+    item { OtoChoice("Album grid columns", listOf("2", "3", "4"), MusicSettings.gridColumns - 2) { upd { MusicSettings.gridColumns = it + 2 } } }
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Audio
+// ---------------------------------------------------------------------------------------------
 
 @Composable
 private fun AudioPage() {
   val context = LocalContext.current
-  PageList {
-    item { MsHeader("Sound") }
-    item { MsAction("Equalizer", "Open the equalizer of your phone") { openEqualizer(context) } }
-    item { MsHeader("Playback") }
-    item { MsSwitch("Pause when headphones disconnect", MusicSettings.pauseOnUnplug) { msSave { MusicSettings.pauseOnUnplug = it } } }
-    item { MsSwitch("Remember queue and position", MusicSettings.restoreQueue) { msSave { MusicSettings.restoreQueue = it } } }
-    item { MsHeader("Library") }
-    item {
-      MsChoice(
-        "Hide songs shorter than",
-        listOf("Off", "10 sec", "30 sec", "60 sec"),
-        listOf(0, 10, 30, 60).indexOf(MusicSettings.minDurationSec).coerceAtLeast(0),
-      ) { msSave { MusicSettings.minDurationSec = listOf(0, 10, 30, 60)[it] } }
-    }
+  OtoPage("Audio") {
+    item { OtoSwitch("Fade music on play or pause (Beta)", "Smooth fade music on pause or resume playback.", MusicSettings.audioFade) { upd { MusicSettings.audioFade = it } } }
+    item { OtoSwitch("Lower volume on focus loss", "Lower the volume when a system sound is played or a notification is received", MusicSettings.duck) { upd { MusicSettings.duck = it } } }
+    item { OtoSwitch("Auto play", "Start playing immediately when a wired headset or bluetooth audio device is plugged in.", MusicSettings.autoPlay) { upd { MusicSettings.autoPlay = it } } }
+    item { OtoSwitch("Keep shuffle mode", "Shuffle mode won't turn off when playing a new list of songs.", MusicSettings.keepShuffle) { upd { MusicSettings.keepShuffle = it } } }
+    item { OtoSwitch("Pause when headphones disconnect", null, MusicSettings.pauseOnUnplug) { upd { MusicSettings.pauseOnUnplug = it } } }
+    item { OtoSwitch("Remember queue and position", "Continue where you stopped next time", MusicSettings.restoreQueue) { upd { MusicSettings.restoreQueue = it } } }
+    item { OtoRow("Equalizer", "Open the equalizer of your phone", true, { openEqualizer(context) }) }
   }
 }
 
-// ---- Personalize ----
-
-@Composable
-private fun PersonalizePage() {
-  val names = listOf("For you", "Songs", "Albums", "Artists", "Playlists")
-  PageList {
-    item { MsHeader("Bottom bar tabs") }
-    names.forEachIndexed { i, n ->
-      item { MsSwitch(n, MusicSettings.isTabVisible(i)) { msSave { MusicSettings.setTabVisible(i, it) } } }
-    }
-    item { MsHeader("Mini player") }
-    item {
-      MsChoice("Buttons", listOf("Play + Next", "Play only", "Previous + Play + Next"), MusicSettings.miniControls) {
-        msSave { MusicSettings.miniControls = it }
-      }
-    }
-  }
-}
-
-// ---- Images ----
-
-@Composable
-private fun ImagesPage() {
-  PageList {
-    item { MsHeader("Album art") }
-    item {
-      MsChoice("Cover shape", listOf("Rounded", "Circle", "Square"), MusicSettings.coverShape) { msSave { MusicSettings.coverShape = it } }
-    }
-    item { MsSwitch("Show album art in song lists", MusicSettings.showSongArt) { msSave { MusicSettings.showSongArt = it } } }
-    item {
-      MsChoice("Album grid columns", listOf("2", "3", "4"), MusicSettings.gridColumns - 2) { msSave { MusicSettings.gridColumns = it + 2 } }
-    }
-    item {
-      MsNote("Covers come from the artwork saved in your music files. Downloading artist pictures from the internet is not supported.")
-    }
-  }
-}
-
-// ---- Other ----
-
-@Composable
-private fun OtherPage(
-  onScan: () -> Unit,
-  onClearHistory: () -> Unit,
-) {
-  PageList {
-    item { MsHeader("Library") }
-    item { MsAction("Scan phone for new music", "Look for songs added recently", onScan) }
-    item { MsAction("Clear history", "Remove the recently played list", onClearHistory) }
-    item { MsHeader("Reset") }
-    item { MsAction("Reset all music settings", "Go back to the default options") { MusicSettings.reset() } }
-  }
-}
-
-// ---- Backup & Restore ----
+// ---------------------------------------------------------------------------------------------
+// Playlists (+ backup)
+// ---------------------------------------------------------------------------------------------
 
 private fun buildBackup(): JSONObject =
   JSONObject()
@@ -346,15 +591,14 @@ private fun buildBackup(): JSONObject =
     .put("library", MusicController.exportJson())
 
 @Composable
-private fun BackupPage() {
+private fun PlaylistsPage() {
   val context = LocalContext.current
   val exportLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
       if (uri != null) {
         val ok =
           runCatching {
-            context.contentResolver.openOutputStream(uri)?.use { it.write(buildBackup().toString(2).toByteArray()) }
-              ?: error("cannot write")
+            context.contentResolver.openOutputStream(uri)?.use { it.write(buildBackup().toString(2).toByteArray()) } ?: error("cannot write")
           }.isSuccess
         Toast.makeText(context, if (ok) "Backup saved" else "Backup failed", Toast.LENGTH_SHORT).show()
       }
@@ -372,127 +616,169 @@ private fun BackupPage() {
         Toast.makeText(context, if (ok) "Backup restored" else "This file is not a music backup", Toast.LENGTH_SHORT).show()
       }
     }
-  PageList {
-    item { MsHeader("Backup") }
+  OtoPage("Playlists") {
     item {
-      MsAction("Back up now", "Save settings, favorites, history and playlists to a file") {
-        exportLauncher.launch("one-player-music-backup.json")
-      }
+      val labels = listOf("No limit", "Past day", "Past week", "Past month", "Past three months", "Past six months", "Past year")
+      val days = listOf(0, 1, 7, 30, 90, 180, 365)
+      OtoChoice("Last added playlist interval", labels, days.indexOf(MusicSettings.lastAddedDays).coerceAtLeast(0)) { upd { MusicSettings.lastAddedDays = days[it] } }
     }
+    item { OtoHeader("Import and export") }
+    item { OtoRow("Back up now", "Save settings, favorites, history and playlists to a file", true, { exportLauncher.launch("one-player-music-backup.json") }) }
     item {
-      MsAction("Restore from file", "Load a backup file you saved before") {
+      OtoRow("Restore from file", "Load a backup file you saved before", true, {
         importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
-      }
+      })
     }
-    item { MsNote("Playlists and favorites remember songs by their number on this phone, so restore them on the same phone.") }
-  }
-}
-
-// ---- About ----
-
-@Composable
-private fun AboutPage() {
-  val context = LocalContext.current
-  val version =
-    runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "-"
-  PageList {
-    item { MsHeader("Music player") }
-    item { MsAction("Version", version) {} }
-    item { MsAction("Package", context.packageName) {} }
-    item { MsNote("A Retro Music Player style music screen built into this app.") }
+    item { OtoNote("Playlists and favorites remember songs by their number on this phone, so restore them on the same phone.") }
   }
 }
 
 // ---------------------------------------------------------------------------------------------
-// Row building blocks
+// Building blocks
 // ---------------------------------------------------------------------------------------------
 
 @Composable
-private fun MsHeader(text: String) {
+private fun OtoHeader(text: String) {
   Text(
-    text,
-    style = MaterialTheme.typography.titleSmall,
+    text.uppercase(),
+    style = MaterialTheme.typography.labelLarge,
     color = MaterialTheme.colorScheme.primary,
-    fontWeight = FontWeight.Bold,
-    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp),
+    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 4.dp),
   )
 }
 
 @Composable
-private fun MsNote(text: String) {
-  Text(
-    text,
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.outline,
-    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-  )
+private fun OtoNote(text: String) {
+  Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
 }
 
 @Composable
-private fun MsChoice(
+private fun OtoRow(
+  title: String,
+  subtitle: String?,
+  enabled: Boolean = true,
+  onClick: (() -> Unit)? = null,
+  trailing: (@Composable () -> Unit)? = null,
+) {
+  val titleColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+  val subColor = if (enabled) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+  Row(
+    modifier =
+      Modifier
+        .fillMaxWidth()
+        .then(if (onClick != null && enabled) Modifier.clickable(onClick = onClick) else Modifier)
+        .padding(horizontal = 24.dp, vertical = 16.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Column(modifier = Modifier.weight(1f)) {
+      Text(title, style = MaterialTheme.typography.titleMedium, color = titleColor)
+      if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = subColor)
+    }
+    if (trailing != null) {
+      Spacer(Modifier.width(16.dp))
+      trailing()
+    }
+  }
+}
+
+@Composable
+private fun OtoSwitch(
+  title: String,
+  subtitle: String?,
+  checked: Boolean,
+  enabled: Boolean = true,
+  onChange: (Boolean) -> Unit,
+) {
+  OtoRow(title, subtitle, enabled, { onChange(!checked) }) { Switch(checked = checked, onCheckedChange = onChange, enabled = enabled) }
+}
+
+@Composable
+private fun OtoChoice(
   title: String,
   options: List<String>,
   selected: Int,
   onSelect: (Int) -> Unit,
 ) {
-  Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-    Text(title, style = MaterialTheme.typography.bodyLarge)
-    Spacer(Modifier.height(6.dp))
-    Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      options.forEachIndexed { i, label ->
-        FilterChip(selected = i == selected, onClick = { onSelect(i) }, label = { Text(label) })
-      }
-    }
+  var open by remember { mutableStateOf(false) }
+  OtoRow(title, options.getOrElse(selected) { options.first() }, true, { open = true })
+  if (open) {
+    AlertDialog(
+      containerColor = popupColor(),
+      onDismissRequest = { open = false },
+      title = { Text(title) },
+      text = {
+        Column {
+          options.forEachIndexed { i, label ->
+            Row(
+              modifier = Modifier.fillMaxWidth().clickable { onSelect(i); open = false }.padding(vertical = 14.dp),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+              RadioButton(selected = i == selected, onClick = null)
+            }
+          }
+        }
+      },
+      confirmButton = {},
+    )
   }
 }
 
 @Composable
-private fun MsSwitch(
-  title: String,
-  checked: Boolean,
-  onChange: (Boolean) -> Unit,
-) {
-  Row(
-    modifier = Modifier.fillMaxWidth().clickable { onChange(!checked) }.padding(horizontal = 16.dp, vertical = 10.dp),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-    Switch(checked = checked, onCheckedChange = onChange)
-  }
-}
-
-@Composable
-private fun MsAction(
+private fun OtoSlider(
   title: String,
   subtitle: String,
-  onClick: () -> Unit,
+  value: Int,
+  range: IntRange,
+  onChange: (Int) -> Unit,
 ) {
-  Column(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp)) {
-    Text(title, style = MaterialTheme.typography.bodyLarge)
-    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+  Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp)) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+      Text("$value", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+    }
+    Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+    Slider(value = value.toFloat(), onValueChange = { onChange(it.toInt()) }, valueRange = range.first.toFloat()..range.last.toFloat())
   }
 }
 
 @Composable
-private fun MsSlider(
+private fun ColorDot(color: Color) {
+  Box(modifier = Modifier.size(56.dp).clip(CircleShape).background(color))
+}
+
+@Composable
+private fun ColorDialog(
   title: String,
-  value: Int,
-  range: IntRange,
-  suffix: String,
-  note: String,
-  onChange: (Int) -> Unit,
+  selected: Int,
+  onSelect: (Int) -> Unit,
+  onDismiss: () -> Unit,
 ) {
-  Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-      Text("$value$suffix", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
-    }
-    Slider(
-      value = value.toFloat(),
-      onValueChange = { onChange(it.toInt()) },
-      valueRange = range.first.toFloat()..range.last.toFloat(),
-      onValueChangeFinished = { MusicSettings.save() },
-    )
-    Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-  }
+  AlertDialog(
+    containerColor = popupColor(),
+    onDismissRequest = onDismiss,
+    title = { Text(title) },
+    text = {
+      Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        accentPalette.chunked(5).forEachIndexed { row, colors ->
+          Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            colors.forEachIndexed { col, c ->
+              val idx = row * 5 + col + 1
+              Box(
+                modifier =
+                  Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(c)
+                    .then(if (selected == idx) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier)
+                    .clickable { onSelect(idx); onDismiss() },
+              )
+            }
+          }
+        }
+        TextButton(onClick = { onSelect(0); onDismiss() }) { Text("Use default") }
+      }
+    },
+    confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+  )
 }
