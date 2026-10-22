@@ -160,6 +160,15 @@ class VideoListViewModel(
     }
   }
 
+  /** Videos of one folder, or every video on the phone for the "Files" view. */
+  private suspend fun queryVideos(): List<Video> =
+    if (bucketId == ALL_FILES) {
+      val folders = MediaFileRepository.getAllVideoFolders(getApplication())
+      MediaFileRepository.getVideosForBuckets(getApplication(), folders.map { it.bucketId }.toSet())
+    } else {
+      MediaFileRepository.getVideosInFolder(getApplication(), bucketId)
+    }
+
   private fun loadVideos(isBackgroundRefresh: Boolean = false) {
     // Cancel any previous in-flight load job to prevent race conditions
     loadJob?.cancel()
@@ -182,7 +191,7 @@ class VideoListViewModel(
         }
 
         // Fast query of basic video info from MediaStore (or filesystem fallback)
-        var videoList = MediaFileRepository.getVideosInFolder(getApplication(), bucketId)
+        var videoList = queryVideos()
 
         if (!isActive) return@launch
 
@@ -205,7 +214,7 @@ class VideoListViewModel(
             triggerMediaScan()
             delay(1000)
             if (!isActive) return@launch
-            var retryVideoList = MediaFileRepository.getVideosInFolder(getApplication(), bucketId)
+            var retryVideoList = queryVideos()
             if (!isActive) return@launch
 
             if (previousVideoCount > 0 && retryVideoList.isEmpty()) {
@@ -400,6 +409,9 @@ class VideoListViewModel(
   }
 
   companion object {
+    /** Special folder id that means "all videos". */
+    const val ALL_FILES = "__ALL_FILES__"
+
     fun factory(
       application: Application,
       bucketId: String,

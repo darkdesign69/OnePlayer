@@ -120,6 +120,8 @@ import kotlin.math.roundToInt
 data class VideoListScreen(
   private val bucketId: String,
   private val folderName: String,
+  /** True when shown as the main "Files" view (all videos) instead of inside a folder. */
+  private val embedded: Boolean = false,
 ) : Screen {
   @OptIn(ExperimentalMaterial3ExpressiveApi::class)
   @Composable
@@ -329,13 +331,13 @@ data class VideoListScreen(
           isInSelectionMode = selectionManager.isInSelectionMode,
           selectedCount = selectionManager.selectedCount,
           totalCount = sortedVideosWithInfo.size,
-          onBackClick = {
+          onBackClick = if (embedded) null else ({
             if (selectionManager.isInSelectionMode) {
               selectionManager.clear()
             } else {
               backstack.removeLastOrNull()
             }
-          },
+          }),
           onCancelSelection = { selectionManager.clear() },
           onSortClick = { sortDialogOpen.value = true },
           onSettingsClick = {
@@ -1011,6 +1013,10 @@ private fun VideoSortDialog(
           if (isFirstOption) FolderViewMode.AlbumView else FolderViewMode.FileManager,
         )
       },
+      thirdOptionLabel = "Files",
+      thirdOptionIcon = androidx.compose.material.icons.Icons.Filled.VideoLibrary,
+      isThirdOptionSelected = folderViewMode == FolderViewMode.AllFiles,
+      onThirdOptionClick = { browserPreferences.folderViewMode.set(FolderViewMode.AllFiles) },
     ),
     layoutModeSelector = ViewModeSelector(
       label = "Layout",

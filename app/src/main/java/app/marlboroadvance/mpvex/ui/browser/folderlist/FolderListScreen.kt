@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.CalendarToday
@@ -136,6 +137,13 @@ object FolderListScreen : Screen {
     when (folderViewMode) {
       FolderViewMode.FileManager -> FileSystemBrowserRootScreen.Content()
       FolderViewMode.AlbumView -> MediaStoreFolderListContent()
+      FolderViewMode.AllFiles ->
+        app.marlboroadvance.mpvex.ui.browser.videolist
+          .VideoListScreen(
+            app.marlboroadvance.mpvex.ui.browser.videolist.VideoListViewModel.ALL_FILES,
+            "Files",
+            true,
+          ).Content()
     }
   }
 
@@ -981,6 +989,10 @@ private fun FolderSortDialog(
           if (isFirstOption) FolderViewMode.AlbumView else FolderViewMode.FileManager,
         )
       },
+      thirdOptionLabel = "Files",
+      thirdOptionIcon = androidx.compose.material.icons.Icons.Filled.VideoLibrary,
+      isThirdOptionSelected = folderViewMode == FolderViewMode.AllFiles,
+      onThirdOptionClick = { browserPreferences.folderViewMode.set(FolderViewMode.AllFiles) },
     ),
     layoutModeSelector = ViewModeSelector(
       label = "Layout",
