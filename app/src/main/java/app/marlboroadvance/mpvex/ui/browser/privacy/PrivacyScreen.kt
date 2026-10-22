@@ -1,6 +1,14 @@
 package app.marlboroadvance.mpvex.ui.browser.privacy
 
 import android.content.Context
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -123,6 +131,11 @@ object PrivacyScreen : Screen {
     var menuOpen by remember { mutableStateOf(false) }
     var showImport by remember { mutableStateOf(false) }
     val canFingerprint = remember { fingerprintAvailable(context) }
+    var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    var renameTarget by remember { mutableStateOf<HiddenVideo?>(null) }
+    val selecting = selectedIds.isNotEmpty()
+    BackHandler(enabled = selecting) { selectedIds = emptySet() }
 
     LaunchedEffect(unlocked) {
       if (unlocked) {
@@ -146,6 +159,10 @@ object PrivacyScreen : Screen {
       scope.launch { hidden = withContext(Dispatchers.IO) { PrivacyStore.load(context) } }
     }
 
+    fun toggle(video: HiddenVideo) {
+      selectedIds = if (video.id in selectedIds) selectedIds - video.id else selectedIds + video.id
+    }
+
     val setupMode = pinHash.isEmpty()
     val videosMode = !setupMode && unlocked
 
@@ -157,18 +174,43 @@ object PrivacyScreen : Screen {
               text =
                 when {
                   setupMode -> "Set PIN"
+                  videosMode && selecting -> "${selectedIds.size} selected"
                   videosMode -> "Private Videos"
                   else -> "Privacy"
                 },
             )
           },
           navigationIcon = {
-            IconButton(onClick = { backstack.removeLastOrNull() }) {
-              Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            if (selecting) {
+              IconButton(onClick = { selectedIds = emptySet() }) { Icon(Icons.Filled.Close, contentDescription = "Cancel selection") }
+            } else {
+              IconButton(onClick = { backstack.removeLastOrNull() }) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+              }
             }
           },
           actions = {
-            if (videosMode) {
+            if (videosMode && selecting) {
+              IconButton(
+                onClick = {
+                  val chosen = hidden.filter { it.id in selectedIds }
+                  selectedIds = emptySet()
+                  scope.launch {
+                    var ok = 0
+                    chosen.forEach { if (PrivacyStore.unhide(context, it)) ok++ }
+                    hidden = withContext(Dispatchers.IO) { PrivacyStore.load(context) }
+                    Toast.makeText(context, "Restored $ok of ${chosen.size} video(s) to their folders", Toast.LENGTH_SHORT).show()
+                  }
+                },
+              ) { Icon(Icons.Filled.LockOpen, contentDescription = "Unlock") }
+              if (selectedIds.size == 1) {
+                IconButton(onClick = { renameTarget = hidden.firstOrNull { it.id in selectedIds } }) {
+                  Icon(Icons.Filled.Edit, contentDescription = "Rename")
+                }
+              }
+              IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Filled.Delete, contentDescription = "Delete") }
+            }
+            if (videosMode && !selecting) {
               IconButton(onClick = { preferences.privacyGrid.set(!gridView) }) {
                 Icon(
                   if (gridView) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.GridView,
@@ -215,7 +257,7 @@ object PrivacyScreen : Screen {
         )
       },
       floatingActionButton = {
-        if (videosMode) {
+        if (videosMode && !selecting) {
           FloatingActionButton(onClick = { showImport = true }) { Icon(Icons.Filled.Add, contentDescription = "Import videos") }
         }
       },
@@ -256,8 +298,9 @@ object PrivacyScreen : Screen {
               gridItems(sorted, key = { it.id }) { video ->
                 HiddenVideoCard(
                   video = video,
-                  onPlay = { playHidden(context, video) },
-                  onUnhide = { unhide(scope, context, video) { reload() } },
+                  selected = video.id in selectedIds,
+                  onClick = { if (selecting) toggle(video) else playHidden(context, video) },
+                  onLongClick = { toggle(video) },
                 )
               }
             }
@@ -266,13 +309,59 @@ object PrivacyScreen : Screen {
               items(sorted, key = { it.id }) { video ->
                 HiddenVideoRow(
                   video = video,
-                  onPlay = { playHidden(context, video) },
-                  onUnhide = { unhide(scope, context, video) { reload() } },
+                  selected = video.id in selectedIds,
+                  onClick = { if (selecting) toggle(video) else playHidden(context, video) },
+                  onLongClick = { toggle(video) },
                 )
               }
             }
         }
       }
+    }
+
+    if (confirmDelete) {
+      val chosen = hidden.filter { it.id in selectedIds }
+      AlertDialog(
+        onDismissRequest = { confirmDelete = false },
+        title = { Text("Delete ${chosen.size} video(s)?") },
+        text = { Text("They will be deleted from your phone for good. This can't be undone.") },
+        confirmButton = {
+          TextButton(
+            onClick = {
+              confirmDelete = false
+              selectedIds = emptySet()
+              scope.launch {
+                val n = PrivacyStore.delete(context, chosen)
+                hidden = withContext(Dispatchers.IO) { PrivacyStore.load(context) }
+                Toast.makeText(context, "$n video(s) deleted", Toast.LENGTH_SHORT).show()
+              }
+            },
+          ) { Text("Delete") }
+        },
+        dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
+      )
+    }
+    renameTarget?.let { target ->
+      var newName by remember(target.id) { mutableStateOf(target.name) }
+      AlertDialog(
+        onDismissRequest = { renameTarget = null },
+        title = { Text("Rename") },
+        text = { OutlinedTextField(value = newName, onValueChange = { newName = it }, singleLine = true) },
+        confirmButton = {
+          TextButton(
+            onClick = {
+              renameTarget = null
+              selectedIds = emptySet()
+              scope.launch {
+                val ok = PrivacyStore.rename(context, target, newName)
+                hidden = withContext(Dispatchers.IO) { PrivacyStore.load(context) }
+                if (!ok) Toast.makeText(context, "Couldn't rename (name empty or already used)", Toast.LENGTH_SHORT).show()
+              }
+            },
+          ) { Text("Rename") }
+        },
+        dismissButton = { TextButton(onClick = { renameTarget = null }) { Text("Cancel") } },
+      )
     }
 
     if (showImport) {
@@ -288,21 +377,6 @@ object PrivacyScreen : Screen {
         },
       )
     }
-  }
-}
-
-private fun unhide(
-  scope: kotlinx.coroutines.CoroutineScope,
-  context: Context,
-  video: HiddenVideo,
-  done: () -> Unit,
-) {
-  scope.launch {
-    val ok = PrivacyStore.unhide(context, video)
-    done()
-    Toast
-      .makeText(context, if (ok) "Restored to its original folder" else "Couldn't restore this video", Toast.LENGTH_SHORT)
-      .show()
   }
 }
 
@@ -570,19 +644,29 @@ private fun Thumb(
   }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun HiddenVideoRow(
   video: HiddenVideo,
-  onPlay: () -> Unit,
-  onUnhide: () -> Unit,
+  selected: Boolean,
+  onClick: () -> Unit,
+  onLongClick: () -> Unit,
 ) {
   val context = LocalContext.current
   Row(
-    modifier = Modifier.fillMaxWidth().clickable(onClick = onPlay).padding(horizontal = 16.dp, vertical = 8.dp),
+    modifier =
+      Modifier
+        .fillMaxWidth()
+        .background(if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else androidx.compose.ui.graphics.Color.Transparent)
+        .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+        .padding(horizontal = 16.dp, vertical = 8.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(14.dp),
   ) {
-    Thumb(video.hiddenPath, Modifier.width(112.dp).aspectRatio(16f / 9f))
+    Box {
+      Thumb(video.hiddenPath, Modifier.width(112.dp).aspectRatio(16f / 9f))
+      if (selected) SelectedMark(Modifier.align(Alignment.TopStart))
+    }
     Column(modifier = Modifier.weight(1f)) {
       Text(
         text = video.name,
@@ -597,25 +681,29 @@ private fun HiddenVideoRow(
         color = MaterialTheme.colorScheme.outline,
       )
     }
-    IconButton(onClick = onUnhide) {
-      Icon(Icons.Filled.LockOpen, contentDescription = "Restore to its folder", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
   }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun HiddenVideoCard(
   video: HiddenVideo,
-  onPlay: () -> Unit,
-  onUnhide: () -> Unit,
+  selected: Boolean,
+  onClick: () -> Unit,
+  onLongClick: () -> Unit,
 ) {
   val context = LocalContext.current
-  Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onPlay)) {
+  Column(
+    modifier =
+      Modifier
+        .fillMaxWidth()
+        .clip(RoundedCornerShape(12.dp))
+        .background(if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else androidx.compose.ui.graphics.Color.Transparent)
+        .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+  ) {
     Box {
       Thumb(video.hiddenPath, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
-      IconButton(onClick = onUnhide, modifier = Modifier.align(Alignment.TopEnd)) {
-        Icon(Icons.Filled.LockOpen, contentDescription = "Restore to its folder", tint = MaterialTheme.colorScheme.onSurface)
-      }
+      if (selected) SelectedMark(Modifier.align(Alignment.TopStart))
     }
     Text(
       text = video.name,
@@ -631,6 +719,16 @@ private fun HiddenVideoCard(
       color = MaterialTheme.colorScheme.outline,
     )
   }
+}
+
+@Composable
+private fun SelectedMark(modifier: Modifier) {
+  Icon(
+    Icons.Filled.CheckCircle,
+    contentDescription = "Selected",
+    tint = MaterialTheme.colorScheme.primary,
+    modifier = modifier.padding(6.dp).size(26.dp).background(MaterialTheme.colorScheme.surface, CircleShape),
+  )
 }
 
 @Composable
