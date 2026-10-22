@@ -33,6 +33,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
@@ -109,7 +110,27 @@ fun SortDialog(
           )
         }
 
-        if (viewModeSelector != null || layoutModeSelector != null) {
+        if (viewModeSelector?.thirdOptionLabel != null) {
+          // Three view modes (Folder / Tree / Files) need the full width, so Layout goes below it
+          Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+          ) {
+            ViewModeSelectorComponent(
+              viewModeSelector = viewModeSelector,
+              enabled = enableViewModeOptions,
+              modifier = Modifier.fillMaxWidth(),
+            )
+            if (layoutModeSelector != null) {
+              HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+              ViewModeSelectorComponent(
+                viewModeSelector = layoutModeSelector,
+                enabled = enableLayoutModeOptions,
+                modifier = Modifier.fillMaxWidth(),
+              )
+            }
+          }
+        } else if (viewModeSelector != null || layoutModeSelector != null) {
           Row(
             modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
