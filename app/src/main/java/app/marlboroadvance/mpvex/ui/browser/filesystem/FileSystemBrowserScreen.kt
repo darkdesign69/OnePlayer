@@ -714,7 +714,15 @@ fun FileSystemBrowserScreen(path: String? = null) {
         }
       },
     ) { padding ->
-      Box(modifier = Modifier.padding(padding)) {
+      Column(modifier = Modifier.padding(padding)) {
+        // Music and Privacy shortcuts on the top level of Tree view, like in Folder view
+        if (isAtRoot && !isSearching && !isInSelectionMode) {
+          app.marlboroadvance.mpvex.ui.browser.folderlist.LibraryChips(
+            onMusicClick = { backstack.add(app.marlboroadvance.mpvex.ui.browser.music.MusicScreen) },
+            onPrivacyClick = { backstack.add(app.marlboroadvance.mpvex.ui.browser.privacy.PrivacyScreen) },
+          )
+        }
+      Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
         when (permissionState.status) {
           PermissionStatus.Granted -> {
             if (isSearching) {
@@ -817,6 +825,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
             )
           }
         }
+      }
       }
     }
 

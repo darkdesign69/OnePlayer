@@ -1,5 +1,6 @@
 package app.marlboroadvance.mpvex
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -22,6 +23,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.toArgb
@@ -39,6 +42,8 @@ import app.marlboroadvance.mpvex.repository.NetworkRepository
 import app.marlboroadvance.mpvex.utils.update.UpdateDialog
 import app.marlboroadvance.mpvex.utils.update.UpdateViewModel
 import app.marlboroadvance.mpvex.ui.browser.MainScreen
+import app.marlboroadvance.mpvex.ui.browser.music.MusicNav
+import app.marlboroadvance.mpvex.ui.browser.music.MusicScreen
 import app.marlboroadvance.mpvex.ui.theme.DarkMode
 import app.marlboroadvance.mpvex.ui.theme.MpvexTheme
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
@@ -56,6 +61,19 @@ import org.koin.android.ext.android.inject
 class MainActivity : ComponentActivity() {
   private val appearancePreferences by inject<AppearancePreferences>()
   private val networkRepository by inject<NetworkRepository>()
+
+  // Goes up each time the music widget asks to open the Now Playing screen
+  private var widgetOpenTick by mutableIntStateOf(0)
+
+  companion object {
+    const val ACTION_OPEN_MUSIC = "app.marlboroadvance.mpvex.action.OPEN_MUSIC"
+  }
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    if (intent.action == ACTION_OPEN_MUSIC) widgetOpenTick++
+  }
   
   // Create a coroutine scope tied to the activity lifecycle
   private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -73,6 +91,8 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     
     PermissionUtils.setMediaAccessLauncher(mediaAccessLauncher)
+
+    if (intent?.action == ACTION_OPEN_MUSIC) widgetOpenTick++
 
     // Register proxy lifecycle observer for network streaming
     lifecycle.addObserver(app.marlboroadvance.mpvex.ui.browser.networkstreaming.proxy.ProxyLifecycleObserver())
@@ -154,6 +174,14 @@ class MainActivity : ComponentActivity() {
 
     @Suppress("UNCHECKED_CAST")
     val typedBackstack = backstack as NavBackStack<Screen>
+
+    // Music widget: tapping the cover or the title opens the Now Playing screen
+    LaunchedEffect(widgetOpenTick) {
+      if (widgetOpenTick > 0) {
+        MusicNav.openNow = true
+        if (typedBackstack.lastOrNull() != MusicScreen) typedBackstack.add(MusicScreen)
+      }
+    }
 
     val context = LocalContext.current
     val currentVersion = BuildConfig.VERSION_NAME.replace("-dev", "")

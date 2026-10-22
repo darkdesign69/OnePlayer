@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
@@ -65,6 +66,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -227,7 +229,13 @@ data class VideoListScreen(
     val showPrivateSpaceCompletionDialog = rememberSaveable { mutableStateOf(false) }
     val privateSpaceMovedCount = remember { mutableIntStateOf(0) }
 
-    val displayFolderName = videos.firstOrNull()?.bucketDisplayName ?: folderName
+    // Files view (all videos) shows the app name like the folder list; inside a folder it shows the folder name
+    val displayFolderName =
+      if (embedded) {
+        stringResource(app.marlboroadvance.mpvex.R.string.app_name)
+      } else {
+        videos.firstOrNull()?.bucketDisplayName ?: folderName
+      }
 
     // FAB visibility state
     val isFabVisible = remember { mutableStateOf(true) }
@@ -407,6 +415,14 @@ data class VideoListScreen(
       val autoScrollToLastPlayed by browserPreferences.autoScrollToLastPlayed.collectAsState()
       
       Box(modifier = Modifier.fillMaxSize()) {
+        androidx.compose.foundation.layout.Column(modifier = Modifier.padding(padding)) {
+        // Music and Privacy shortcuts in Files view, like in Folder view
+        if (embedded && !selectionManager.isInSelectionMode) {
+          app.marlboroadvance.mpvex.ui.browser.folderlist.LibraryChips(
+            onMusicClick = { backstack.add(app.marlboroadvance.mpvex.ui.browser.music.MusicScreen) },
+            onPrivacyClick = { backstack.add(app.marlboroadvance.mpvex.ui.browser.privacy.PrivacyScreen) },
+          )
+        }
         VideoListContent(
           folderId = bucketId,
           videosWithInfo = sortedVideosWithInfo,
@@ -430,9 +446,10 @@ data class VideoListScreen(
           },
           onVideoLongClick = { video -> selectionManager.toggle(video) },
           isFabVisible = isFabVisible,
-          modifier = Modifier.padding(padding),
+          modifier = Modifier.weight(1f).fillMaxWidth(),
           showFloatingBottomBar = showFloatingBottomBar,
         )
+        }
         
         // Floating Material 3 Button Group overlay with animation
         // Play Store gating is intentionally bypassed here.
