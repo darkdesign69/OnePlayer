@@ -40,6 +40,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import app.marlboroadvance.mpvex.R
+import app.marlboroadvance.mpvex.widget.MusicWidgetUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -873,11 +874,49 @@ object MusicController {
     clearSavedQueue()
     session?.isActive = false
     app.stopService(Intent(app, MusicPlaybackService::class.java))
+    MusicWidgetUpdater.update(app)
+  }
+
+  /** True while the widget is loading the library to start music in a fresh process. */
+  @Volatile var widgetLoading = false
+
+  /**
+   * Used by the home screen widget. If a queue is loaded it just plays or pauses. If the app was closed it
+   * brings back the last queue (or the library, starting at the last played song) and plays it.
+   */
+  fun startFromWidget(
+    context: Context,
+    pauseIfPlaying: Boolean = true,
+  ) {
+    init(context)
+    if (queue.isNotEmpty()) {
+      if (pauseIfPlaying) togglePlay()
+      return
+    }
+    if (widgetLoading) return
+    widgetLoading = true
+    Thread {
+      val tracks = try { loadMusicTracks(app) } catch (_: Exception) { emptyList() }
+      handler.post {
+        widgetLoading = false
+        if (queue.isEmpty() && tracks.isNotEmpty()) {
+          restoreQueue(tracks.associateBy { it.id })
+          if (queue.isNotEmpty()) {
+            resume()
+          } else {
+            val last = history.firstOrNull()
+            play(tracks, tracks.indexOfFirst { it.id == last }.coerceAtLeast(0))
+          }
+        }
+        if (current == null) app.stopService(Intent(app, MusicPlaybackService::class.java))
+      }
+    }.start()
   }
 
   private fun onStateChanged() {
     saveQueueState()
     updateSession()
+    MusicWidgetUpdater.update(app)
     if (current == null) return
     try {
       if (serviceRunning) {
@@ -995,9 +1034,9 @@ class MusicPlaybackService : Service() {
   ): Int {
     MusicController.init(applicationContext)
     when (intent?.action) {
-      ACTION_TOGGLE -> MusicController.togglePlay()
-      ACTION_NEXT -> MusicController.next()
-      ACTION_PREV -> MusicController.previous()
+      ACTION_TOGGLE -> if (MusicController.queue.isEmpty()) MusicController.startFromWidget(applicationContext) else MusicController.togglePlay()
+      ACTION_NEXT -> if (MusicController.queue.isEmpty()) MusicController.startFromWidget(applicationContext, false) else MusicController.next()
+      ACTION_PREV -> if (MusicController.queue.isEmpty()) MusicController.startFromWidget(applicationContext, false) else MusicController.previous()
       ACTION_STOP -> {
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         MusicController.stopAll()
@@ -1010,7 +1049,7 @@ class MusicPlaybackService : Service() {
       ServiceCompat.startForeground(this, MusicController.NOTIF_ID, MusicController.buildNotification(this), type)
     } catch (_: Exception) {
     }
-    if (MusicController.current == null) stopSelf()
+    if (MusicController.current == null && !MusicController.widgetLoading) stopSelf()
     return START_NOT_STICKY
   }
 

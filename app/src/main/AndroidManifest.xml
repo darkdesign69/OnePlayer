@@ -289,6 +289,55 @@
             </intent-filter>
         </receiver>
 
+        <!-- Music player widgets -->
+        <receiver
+            android:name=".widget.MusicWidgetSmallProvider"
+            android:exported="true"
+            android:label="@string/music_widget_small_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/music_widget_small_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.MusicWidgetMediumProvider"
+            android:exported="true"
+            android:label="@string/music_widget_medium_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/music_widget_medium_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.MusicWidgetLargeProvider"
+            android:exported="true"
+            android:label="@string/music_widget_large_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/music_widget_large_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.MusicWidgetTextProvider"
+            android:exported="true"
+            android:label="@string/music_widget_text_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/music_widget_text_info" />
+        </receiver>
+
         <!-- Media scan receiver to detect when new videos are added -->
         <receiver
             android:name=".utils.media.MediaScanReceiver"
