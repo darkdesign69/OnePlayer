@@ -172,4 +172,43 @@ object PrivacyStore {
       }
       ok
     }
+
+  /** Permanently deletes hidden videos. Returns how many were deleted. */
+  suspend fun delete(
+    context: Context,
+    videos: List<HiddenVideo>,
+  ): Int =
+    withContext(Dispatchers.IO) {
+      var count = 0
+      videos.forEach { v ->
+        val f = File(v.hiddenPath)
+        if (!f.exists() || f.delete()) count++
+      }
+      val ids = videos.map { it.id }.toSet()
+      save(context, load(context).filter { it.id !in ids })
+      count
+    }
+
+  /** Renames a hidden video. It also comes back with the new name when it is restored. */
+  suspend fun rename(
+    context: Context,
+    video: HiddenVideo,
+    newName: String,
+  ): Boolean =
+    withContext(Dispatchers.IO) {
+      var name = newName.trim().replace('/', '_')
+      if (name.isEmpty()) return@withContext false
+      val oldExt = video.name.substringAfterLast('.', "")
+      if (!name.contains('.') && oldExt.isNotEmpty()) name = "$name.$oldExt"
+      if (name == video.name) return@withContext true
+      val src = File(video.hiddenPath)
+      if (!src.isFile) return@withContext false
+      val dest = File(src.parentFile, name)
+      if (dest.exists() || !src.renameTo(dest)) return@withContext false
+      val original = File(video.originalPath)
+      val newOriginal = File(original.parentFile, name).absolutePath
+      val updated = load(context).map { if (it.id == video.id) it.copy(name = name, hiddenPath = dest.absolutePath, originalPath = newOriginal) else it }
+      save(context, updated)
+      true
+    }
 }
