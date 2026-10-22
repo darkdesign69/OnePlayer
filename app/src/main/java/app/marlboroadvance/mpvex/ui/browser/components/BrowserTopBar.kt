@@ -188,21 +188,6 @@ private fun NormalTopBar(
         }
         .pointerInput(onTitleLongPress) {
           detectTapGestures(
-            onTap = { localOffset ->
-              // Don't allow theme change if animation is in progress
-              if (themeTransition?.isAnimating == true) return@detectTapGestures
-              
-              // Calculate window position for circular reveal
-              val windowOffset = Offset(
-                titleBounds.value.left + localOffset.x,
-                titleBounds.value.top + localOffset.y
-              )
-              themeTransition?.startTransition(windowOffset)
-              // Delay theme change to allow overlay to display first
-              coroutineScope.launch {
-                toggleDarkMode()
-              }
-            },
             onLongPress = if (onTitleLongPress != null) {
               { onTitleLongPress() }
             } else null
