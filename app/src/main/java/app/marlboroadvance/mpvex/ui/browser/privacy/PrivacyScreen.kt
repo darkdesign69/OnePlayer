@@ -133,6 +133,7 @@ object PrivacyScreen : Screen {
     val canFingerprint = remember { fingerprintAvailable(context) }
     var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var showChangePin by remember { mutableStateOf(false) }
     var renameTarget by remember { mutableStateOf<HiddenVideo?>(null) }
     val selecting = selectedIds.isNotEmpty()
     BackHandler(enabled = selecting) { selectedIds = emptySet() }
@@ -239,8 +240,15 @@ object PrivacyScreen : Screen {
                       },
                     )
                   }
+                  HorizontalDivider()
+                  DropdownMenuItem(
+                    text = { Text("Change PIN") },
+                    onClick = {
+                      menuOpen = false
+                      showChangePin = true
+                    },
+                  )
                   if (canFingerprint) {
-                    HorizontalDivider()
                     DropdownMenuItem(
                       text = { Text("Unlock with fingerprint") },
                       trailingIcon = { Checkbox(checked = fingerprintOn, onCheckedChange = null) },
@@ -319,6 +327,19 @@ object PrivacyScreen : Screen {
       }
     }
 
+    if (showChangePin) {
+      ChangePinDialog(
+        verify = { pin -> hashPrivacyPin(preferences.privacyPinSalt.get(), pin) == preferences.privacyPinHash.get() },
+        onDismiss = { showChangePin = false },
+        onNewPin = { pin ->
+          val salt = newPrivacySalt()
+          preferences.privacyPinSalt.set(salt)
+          preferences.privacyPinHash.set(hashPrivacyPin(salt, pin))
+          showChangePin = false
+          Toast.makeText(context, "PIN changed", Toast.LENGTH_SHORT).show()
+        },
+      )
+    }
     if (confirmDelete) {
       val chosen = hidden.filter { it.id in selectedIds }
       AlertDialog(
@@ -595,6 +616,100 @@ private fun UnlockContent(
         }
       },
     )
+  }
+}
+
+@Composable
+private fun ChangePinDialog(
+  verify: (String) -> Boolean,
+  onDismiss: () -> Unit,
+  onNewPin: (String) -> Unit,
+) {
+  var step by remember { mutableStateOf(0) }
+  var entry by remember { mutableStateOf("") }
+  var first by remember { mutableStateOf("") }
+  var error by remember { mutableStateOf<String?>(null) }
+  Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Surface(modifier = Modifier.fillMaxSize()) {
+      Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+          IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "Close") }
+          Text("Change PIN", style = MaterialTheme.typography.titleLarge)
+        }
+        Column(
+          modifier = Modifier.weight(1f).fillMaxWidth(),
+          horizontalAlignment = Alignment.CenterHorizontally,
+          verticalArrangement = Arrangement.Center,
+        ) {
+          Text(
+            when (step) {
+              0 -> "Enter current PIN"
+              1 -> "Enter new PIN"
+              else -> "Confirm new PIN"
+            },
+            style = MaterialTheme.typography.titleMedium,
+          )
+          Spacer(Modifier.height(36.dp))
+          PinDots(count = if (step == 0) maxOf(4, entry.length) else 4, filled = entry.length)
+          Spacer(Modifier.height(24.dp))
+          Text(text = error ?: " ", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+          if (step == 0) {
+            TextButton(
+              onClick = {
+                if (verify(entry)) {
+                  step = 1
+                  entry = ""
+                  error = null
+                } else {
+                  error = "Wrong PIN"
+                  entry = ""
+                }
+              },
+              enabled = entry.length >= 4,
+            ) { Text("Next") }
+          }
+        }
+        PinKeypad(
+          onDigit = { d ->
+            when (step) {
+              0 ->
+                if (entry.length < 8) {
+                  entry += d
+                  error = null
+                  if (entry.length >= 4 && verify(entry)) {
+                    step = 1
+                    entry = ""
+                  }
+                }
+              1 ->
+                if (entry.length < 4) {
+                  entry += d
+                  if (entry.length == 4) {
+                    first = entry
+                    entry = ""
+                    step = 2
+                  }
+                }
+              else ->
+                if (entry.length < 4) {
+                  entry += d
+                  if (entry.length == 4) {
+                    if (entry == first) {
+                      onNewPin(entry)
+                    } else {
+                      error = "The PINs don't match. Try again."
+                      first = ""
+                      entry = ""
+                      step = 1
+                    }
+                  }
+                }
+            }
+          },
+          onBackspace = { if (entry.isNotEmpty()) entry = entry.dropLast(1) },
+        )
+      }
+    }
   }
 }
 
