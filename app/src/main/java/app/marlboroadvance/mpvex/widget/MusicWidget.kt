@@ -14,7 +14,9 @@ import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Shader
+import android.os.Build
 import android.os.Bundle
+import android.util.TypedValue
 import android.os.Handler
 import android.os.Looper
 import android.view.View
@@ -37,9 +39,9 @@ enum class MusicWidgetKind(
   val defaultHeightDp: Int,
 ) {
   Small(110, 110),
-  Medium(144, 80),
-  Large(288, 80),
-  Text(144, 80),
+  Medium(144, 68),
+  Large(288, 68),
+  Text(144, 68),
 }
 
 abstract class MusicWidgetProvider : AppWidgetProvider() {
@@ -264,7 +266,19 @@ object MusicWidgetUpdater {
       rv.setViewVisibility(R.id.widget_artist, if (hDp >= 130) View.VISIBLE else View.GONE)
     }
     if ((kind == MusicWidgetKind.Medium || kind == MusicWidgetKind.Large) && !tall) {
-      rv.setViewVisibility(R.id.widget_progress, if (hDp >= 80) View.VISIBLE else View.GONE)
+      // one row high: only the title and the buttons, so nothing is squeezed
+      val roomy = hDp >= 90
+      rv.setViewVisibility(R.id.widget_progress, if (roomy) View.VISIBLE else View.GONE)
+      rv.setViewVisibility(R.id.widget_artist, if (roomy) View.VISIBLE else View.GONE)
+    }
+    if (kind == MusicWidgetKind.Text) {
+      rv.setViewVisibility(R.id.widget_artist, if (hDp >= 80) View.VISIBLE else View.GONE)
+    }
+    if (tall && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      // taller widget: the cover grows with the height so the widget never looks empty
+      val side = (hDp - 28).coerceIn(56, 140).toFloat()
+      rv.setViewLayoutWidth(R.id.widget_art, side, TypedValue.COMPLEX_UNIT_DIP)
+      rv.setViewLayoutHeight(R.id.widget_art, side, TypedValue.COMPLEX_UNIT_DIP)
     }
 
     // buttons: control the music service, the app stays closed
