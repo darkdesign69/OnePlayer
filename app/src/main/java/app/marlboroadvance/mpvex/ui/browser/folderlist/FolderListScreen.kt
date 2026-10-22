@@ -136,6 +136,13 @@ object FolderListScreen : Screen {
     when (folderViewMode) {
       FolderViewMode.FileManager -> FileSystemBrowserRootScreen.Content()
       FolderViewMode.AlbumView -> MediaStoreFolderListContent()
+      FolderViewMode.AllFiles ->
+        app.marlboroadvance.mpvex.ui.browser.videolist
+          .VideoListScreen(
+            app.marlboroadvance.mpvex.ui.browser.videolist.VideoListViewModel.ALL_FILES,
+            "Files",
+            true,
+          ).Content()
     }
   }
 
@@ -981,6 +988,10 @@ private fun FolderSortDialog(
           if (isFirstOption) FolderViewMode.AlbumView else FolderViewMode.FileManager,
         )
       },
+      thirdOptionLabel = "Files",
+      thirdOptionIcon = androidx.compose.material.icons.Icons.Filled.VideoLibrary,
+      isThirdOptionSelected = folderViewMode == FolderViewMode.AllFiles,
+      onThirdOptionClick = { browserPreferences.folderViewMode.set(FolderViewMode.AllFiles) },
     ),
     layoutModeSelector = ViewModeSelector(
       label = "Layout",

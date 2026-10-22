@@ -175,6 +175,11 @@ data class ViewModeSelector(
   val secondOptionIcon: ImageVector,
   val isFirstOptionSelected: Boolean,
   val onViewModeChange: (Boolean) -> Unit,
+  /** Optional third choice (used for the "Files" view that lists every video). */
+  val thirdOptionLabel: String? = null,
+  val thirdOptionIcon: ImageVector? = null,
+  val isThirdOptionSelected: Boolean = false,
+  val onThirdOptionClick: (() -> Unit)? = null,
 )
 
 data class GridColumnSelector(
@@ -314,9 +319,25 @@ private fun ViewModeSelectorComponent(
   enabled: Boolean = true,
   modifier: Modifier = Modifier,
 ) {
-  val options = listOf(viewModeSelector.firstOptionLabel, viewModeSelector.secondOptionLabel)
-  val icons = listOf(viewModeSelector.firstOptionIcon, viewModeSelector.secondOptionIcon)
-  val selectedIndex = if (viewModeSelector.isFirstOptionSelected) 0 else 1
+  val hasThird = viewModeSelector.thirdOptionLabel != null && viewModeSelector.thirdOptionIcon != null
+  val options =
+    if (hasThird) {
+      listOf(viewModeSelector.firstOptionLabel, viewModeSelector.secondOptionLabel, viewModeSelector.thirdOptionLabel!!)
+    } else {
+      listOf(viewModeSelector.firstOptionLabel, viewModeSelector.secondOptionLabel)
+    }
+  val icons =
+    if (hasThird) {
+      listOf(viewModeSelector.firstOptionIcon, viewModeSelector.secondOptionIcon, viewModeSelector.thirdOptionIcon!!)
+    } else {
+      listOf(viewModeSelector.firstOptionIcon, viewModeSelector.secondOptionIcon)
+    }
+  val selectedIndex =
+    when {
+      hasThird && viewModeSelector.isThirdOptionSelected -> 2
+      viewModeSelector.isFirstOptionSelected -> 0
+      else -> 1
+    }
 
   Column(
     modifier = modifier,
@@ -349,7 +370,11 @@ private fun ViewModeSelectorComponent(
             .clip(shape)
             .clickable(enabled = enabled) { 
               if (enabled) {
-                viewModeSelector.onViewModeChange(index == 0)
+                when (index) {
+                  0 -> viewModeSelector.onViewModeChange(true)
+                  1 -> viewModeSelector.onViewModeChange(false)
+                  else -> viewModeSelector.onThirdOptionClick?.invoke()
+                }
               }
             }
             .padding(8.dp),

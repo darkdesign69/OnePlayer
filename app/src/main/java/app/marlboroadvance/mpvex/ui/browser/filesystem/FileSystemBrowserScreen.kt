@@ -1473,6 +1473,12 @@ fun FileSystemSortDialog(
           },
         )
       },
+      thirdOptionLabel = "Files",
+      thirdOptionIcon = androidx.compose.material.icons.Icons.Filled.VideoLibrary,
+      isThirdOptionSelected = folderViewMode == app.marlboroadvance.mpvex.preferences.FolderViewMode.AllFiles,
+      onThirdOptionClick = {
+        browserPreferences.folderViewMode.set(app.marlboroadvance.mpvex.preferences.FolderViewMode.AllFiles)
+      },
     ),
     layoutModeSelector = ViewModeSelector(
       label = "Layout",
