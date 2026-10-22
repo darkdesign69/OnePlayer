@@ -16,9 +16,9 @@
       android:gravity="center_vertical"
       android:orientation="horizontal"
       android:paddingStart="6dp"
-      android:paddingTop="4dp"
+      android:paddingTop="2dp"
       android:paddingEnd="6dp"
-      android:paddingBottom="4dp">
+      android:paddingBottom="2dp">
 
     <ImageView
         android:id="@+id/widget_art"
@@ -101,37 +101,37 @@
             android:textSize="9sp" />
         <FrameLayout
             android:id="@+id/widget_prev"
-            android:layout_width="34dp"
-            android:layout_height="28dp"
+            android:layout_width="44dp"
+            android:layout_height="40dp"
             android:contentDescription="@string/music_widget_prev">
           <ImageView
-              android:layout_width="20dp"
-              android:layout_height="20dp"
+              android:layout_width="26dp"
+              android:layout_height="26dp"
               android:layout_gravity="center"
               android:src="@drawable/widget_ic_prev" />
         </FrameLayout>
         <FrameLayout
             android:id="@+id/widget_play"
-            android:layout_width="36dp"
-            android:layout_height="28dp"
+            android:layout_width="48dp"
+            android:layout_height="40dp"
             android:contentDescription="@string/music_widget_play_pause">
           <ImageView
               android:id="@+id/widget_play_icon"
-              android:layout_width="26dp"
-              android:layout_height="26dp"
+              android:layout_width="36dp"
+              android:layout_height="36dp"
               android:layout_gravity="center"
               android:background="@drawable/widget_play_bg"
-              android:padding="5dp"
+              android:padding="8dp"
               android:src="@drawable/widget_ic_play" />
         </FrameLayout>
         <FrameLayout
             android:id="@+id/widget_next"
-            android:layout_width="34dp"
-            android:layout_height="28dp"
+            android:layout_width="44dp"
+            android:layout_height="40dp"
             android:contentDescription="@string/music_widget_next">
           <ImageView
-              android:layout_width="20dp"
-              android:layout_height="20dp"
+              android:layout_width="26dp"
+              android:layout_height="26dp"
               android:layout_gravity="center"
               android:src="@drawable/widget_ic_next" />
         </FrameLayout>

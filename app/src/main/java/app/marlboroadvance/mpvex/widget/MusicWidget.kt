@@ -36,10 +36,10 @@ enum class MusicWidgetKind(
   val defaultWidthDp: Int,
   val defaultHeightDp: Int,
 ) {
-  Small(72, 72),
-  Medium(144, 72),
-  Large(288, 72),
-  Text(144, 72),
+  Small(110, 110),
+  Medium(144, 80),
+  Large(288, 80),
+  Text(144, 80),
 }
 
 abstract class MusicWidgetProvider : AppWidgetProvider() {
@@ -256,6 +256,15 @@ object MusicWidgetUpdater {
       rv.setProgressBar(R.id.widget_progress, 1000, (ratio * 1000).toInt(), false)
       rv.setTextViewText(R.id.widget_elapsed, fmt(st.posMs))
       rv.setTextViewText(R.id.widget_total, fmt(st.durMs))
+    }
+
+    if (kind == MusicWidgetKind.Small) {
+      // the small widget can be resized: show only what fits
+      rv.setViewVisibility(R.id.widget_art, if (hDp >= 100) View.VISIBLE else View.GONE)
+      rv.setViewVisibility(R.id.widget_artist, if (hDp >= 130) View.VISIBLE else View.GONE)
+    }
+    if ((kind == MusicWidgetKind.Medium || kind == MusicWidgetKind.Large) && !tall) {
+      rv.setViewVisibility(R.id.widget_progress, if (hDp >= 80) View.VISIBLE else View.GONE)
     }
 
     // buttons: control the music service, the app stays closed

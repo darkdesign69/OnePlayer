@@ -101,37 +101,37 @@
             android:textSize="11sp" />
         <FrameLayout
             android:id="@+id/widget_prev"
-            android:layout_width="48dp"
-            android:layout_height="40dp"
+            android:layout_width="52dp"
+            android:layout_height="44dp"
             android:contentDescription="@string/music_widget_prev">
           <ImageView
-              android:layout_width="28dp"
-              android:layout_height="28dp"
+              android:layout_width="30dp"
+              android:layout_height="30dp"
               android:layout_gravity="center"
               android:src="@drawable/widget_ic_prev" />
         </FrameLayout>
         <FrameLayout
             android:id="@+id/widget_play"
-            android:layout_width="52dp"
-            android:layout_height="40dp"
+            android:layout_width="56dp"
+            android:layout_height="44dp"
             android:contentDescription="@string/music_widget_play_pause">
           <ImageView
               android:id="@+id/widget_play_icon"
-              android:layout_width="38dp"
-              android:layout_height="38dp"
+              android:layout_width="42dp"
+              android:layout_height="42dp"
               android:layout_gravity="center"
               android:background="@drawable/widget_play_bg"
-              android:padding="8dp"
+              android:padding="9dp"
               android:src="@drawable/widget_ic_play" />
         </FrameLayout>
         <FrameLayout
             android:id="@+id/widget_next"
-            android:layout_width="48dp"
-            android:layout_height="40dp"
+            android:layout_width="52dp"
+            android:layout_height="44dp"
             android:contentDescription="@string/music_widget_next">
           <ImageView
-              android:layout_width="28dp"
-              android:layout_height="28dp"
+              android:layout_width="30dp"
+              android:layout_height="30dp"
               android:layout_gravity="center"
               android:src="@drawable/widget_ic_next" />
         </FrameLayout>
