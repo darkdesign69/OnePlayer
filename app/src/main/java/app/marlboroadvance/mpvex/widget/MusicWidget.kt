@@ -48,14 +48,16 @@ enum class MusicWidgetKind(
 }
 
 /** The layout a widget uses at its current size. Every widget can be resized into any of them. */
-private enum class WidgetShape { Tiny, Square, Wide, Large }
+private enum class WidgetShape { Tiny, Compact, Square, Wide, Large }
 
 private fun shapeFor(
   wDp: Int,
   hDp: Int,
 ): WidgetShape =
   when {
-    wDp < 100 || (hDp < 100 && wDp < 270) -> WidgetShape.Tiny
+    wDp < 100 -> WidgetShape.Tiny
+    // thin widget: dark card, cover on the left, title, artist and one row of buttons
+    hDp < 100 && (wDp < 270 || hDp < 62) -> WidgetShape.Compact
     hDp < 100 -> WidgetShape.Wide
     wDp < 260 -> WidgetShape.Square
     else -> WidgetShape.Large
@@ -292,6 +294,7 @@ object MusicWidgetUpdater {
     val layout =
       when (shape) {
         WidgetShape.Tiny -> R.layout.widget_music_small
+        WidgetShape.Compact -> R.layout.widget_music_compact
         WidgetShape.Square -> R.layout.widget_music_medium
         WidgetShape.Wide -> R.layout.widget_music_wide
         WidgetShape.Large -> R.layout.widget_music_large
@@ -312,6 +315,7 @@ object MusicWidgetUpdater {
       when (shape) {
         WidgetShape.Tiny -> hero(cover, bgW, bgH, radius, stroke, 0xB4)
         WidgetShape.Square -> hero(cover, bgW, bgH, radius, stroke, 0xE8)
+        WidgetShape.Compact -> compactCard(cover, bgW, bgH, radius, stroke)
         else -> glass(blurOf(st.art), bgW, bgH, radius, stroke)
       }
     rv.setImageViewBitmap(R.id.widget_bg, bg)
@@ -343,6 +347,30 @@ object MusicWidgetUpdater {
         rv.setViewVisibility(R.id.widget_repeat, if (rowFav) View.VISIBLE else View.GONE)
         rv.setViewVisibility(R.id.widget_fav, if (rowFav) View.VISIBLE else View.GONE)
         setProgress(rv, st)
+      }
+      WidgetShape.Compact -> {
+        // only show what really fits, so nothing can overlap the buttons
+        val textW = wDp - hDp - 16
+        val fiveButtons = textW >= 150
+        val prevNext = textW >= 90
+        rv.setImageViewResource(R.id.widget_fav_icon, favRes)
+        rv.setImageViewResource(R.id.widget_repeat_icon, repRes)
+        rv.setViewVisibility(R.id.widget_title, if (hDp >= 52) View.VISIBLE else View.GONE)
+        rv.setViewVisibility(R.id.widget_artist, if (hDp >= 66) View.VISIBLE else View.GONE)
+        rv.setViewVisibility(R.id.widget_progress, if (hDp >= 72) View.VISIBLE else View.GONE)
+        rv.setViewVisibility(R.id.widget_prev, if (prevNext) View.VISIBLE else View.GONE)
+        rv.setViewVisibility(R.id.widget_next, if (prevNext) View.VISIBLE else View.GONE)
+        rv.setViewVisibility(R.id.widget_repeat, if (fiveButtons) View.VISIBLE else View.GONE)
+        rv.setViewVisibility(R.id.widget_fav, if (fiveButtons) View.VISIBLE else View.GONE)
+        setProgress(rv, st)
+        // text starts after the cover, which is as wide as the widget is high
+        rv.setViewPadding(
+          R.id.widget_compact_content,
+          ((hDp + 8) * density).toInt(),
+          (3 * density).toInt(),
+          (8 * density).toInt(),
+          (3 * density).toInt(),
+        )
       }
       WidgetShape.Square -> {
         rv.setImageViewResource(R.id.widget_fav_top_icon, favRes)
@@ -552,6 +580,29 @@ object MusicWidgetUpdater {
     p.color = 0x44FFFFFF
     val half = stroke / 2f
     c.drawRoundRect(RectF(rect.left + half, rect.top + half, rect.right - half, rect.bottom - half), radius, radius, p)
+  }
+
+  /** Flat dark card with the cover flush on the left (square, as high as the card), for thin widgets. */
+  private fun compactCard(
+    cover: Bitmap,
+    w: Int,
+    h: Int,
+    radius: Float,
+    stroke: Float,
+  ): Bitmap {
+    val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val c = Canvas(out)
+    val rect = RectF(0f, 0f, w.toFloat(), h.toFloat())
+    val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    p.color = 0xFF232326.toInt()
+    c.drawRoundRect(rect, radius, radius, p)
+    val side = min(w, h)
+    p.shader = BitmapShader(centerCrop(cover, side, side), Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+    // rounded on the card's left corners, straight where it meets the dark part
+    c.drawRoundRect(RectF(0f, 0f, side.toFloat(), side.toFloat()), radius, radius, p)
+    c.drawRect(RectF(side / 2f, 0f, side.toFloat(), side.toFloat()), p)
+    border(c, rect, radius, stroke)
+    return out
   }
 
   /** Full-bleed cover with a dark fade towards the bottom, for the 1x1 and 2x2 widgets. */

@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+  <!-- dark card with the cover drawn flush on the left (done in code) -->
+  <ImageView
+      android:id="@+id/widget_bg"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:scaleType="fitXY"
+      android:src="@drawable/widget_bg_default" />
+
+  <!-- the left padding is set in code so the text starts after the cover -->
+  <LinearLayout
+      android:id="@+id/widget_compact_content"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:gravity="center_vertical"
+      android:orientation="vertical"
+      android:paddingStart="48dp"
+      android:paddingTop="3dp"
+      android:paddingEnd="8dp"
+      android:paddingBottom="3dp">
+
+    <LinearLayout
+        android:id="@+id/widget_title_area"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+      <!-- dp (not sp) so a big system font size can never push the buttons out -->
+      <TextView
+          android:id="@+id/widget_title"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:ellipsize="end"
+          android:includeFontPadding="false"
+          android:maxLines="1"
+          android:singleLine="true"
+          android:text="One Player"
+          android:textColor="#FFFFFFFF"
+          android:textSize="13dp"
+          android:textStyle="bold" />
+      <TextView
+          android:id="@+id/widget_artist"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:ellipsize="end"
+          android:includeFontPadding="false"
+          android:maxLines="1"
+          android:singleLine="true"
+          android:text="Tap play to start music"
+          android:textColor="#CCFFFFFF"
+          android:textSize="11dp" />
+    </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/widget_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_marginTop="3dp"
+        android:max="1000"
+        android:progress="0"
+        android:progressDrawable="@drawable/widget_progress" />
+
+    <!-- buttons spread evenly over the width, like the reference -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="30dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+      <FrameLayout
+          android:id="@+id/widget_repeat"
+          android:layout_width="0dp"
+          android:layout_height="match_parent"
+          android:layout_weight="1"
+          android:contentDescription="@string/music_widget_repeat">
+        <ImageView
+            android:id="@+id/widget_repeat_icon"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_gravity="center"
+            android:src="@drawable/widget_ic_repeat_off" />
+      </FrameLayout>
+      <FrameLayout
+          android:id="@+id/widget_prev"
+          android:layout_width="0dp"
+          android:layout_height="match_parent"
+          android:layout_weight="1"
+          android:contentDescription="@string/music_widget_prev">
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center"
+            android:src="@drawable/widget_ic_prev" />
+      </FrameLayout>
+      <FrameLayout
+          android:id="@+id/widget_play"
+          android:layout_width="0dp"
+          android:layout_height="match_parent"
+          android:layout_weight="1"
+          android:contentDescription="@string/music_widget_play_pause">
+        <ImageView
+            android:id="@+id/widget_play_icon"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="center"
+            android:background="@drawable/widget_play_bg"
+            android:padding="6dp"
+            android:src="@drawable/widget_ic_play" />
+      </FrameLayout>
+      <FrameLayout
+          android:id="@+id/widget_next"
+          android:layout_width="0dp"
+          android:layout_height="match_parent"
+          android:layout_weight="1"
+          android:contentDescription="@string/music_widget_next">
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center"
+            android:src="@drawable/widget_ic_next" />
+      </FrameLayout>
+      <FrameLayout
+          android:id="@+id/widget_fav"
+          android:layout_width="0dp"
+          android:layout_height="match_parent"
+          android:layout_weight="1"
+          android:contentDescription="@string/music_widget_favourite">
+        <ImageView
+            android:id="@+id/widget_fav_icon"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_gravity="center"
+            android:src="@drawable/widget_ic_fav" />
+      </FrameLayout>
+    </LinearLayout>
+  </LinearLayout>
+</FrameLayout>
