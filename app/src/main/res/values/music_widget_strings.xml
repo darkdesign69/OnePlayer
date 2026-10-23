@@ -1,7 +1,8 @@
 <resources>
-  <string name="music_widget_small_label" translatable="false">Music player (small)</string>
-  <string name="music_widget_medium_label" translatable="false">Music player (medium)</string>
-  <string name="music_widget_large_label" translatable="false">Music player (large)</string>
+  <string name="music_widget_small_label" translatable="false">Music player (1x1)</string>
+  <string name="music_widget_medium_label" translatable="false">Music player (2x2)</string>
+  <string name="music_widget_large_label" translatable="false">Music player (4x2)</string>
+  <string name="music_widget_wide_label" translatable="false">Music player (4x1)</string>
   <string name="music_widget_text_label" translatable="false">Music player (text only)</string>
   <string name="music_widget_description" translatable="false">Play and control your music. Tap anywhere except the buttons to open the player.</string>
   <string name="music_widget_idle_title" translatable="false">One Player</string>

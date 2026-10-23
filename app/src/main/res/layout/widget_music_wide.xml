@@ -17,9 +17,7 @@
       android:gravity="center_vertical"
       android:orientation="horizontal"
       android:paddingStart="8dp"
-      android:paddingTop="2dp"
-      android:paddingEnd="6dp"
-      android:paddingBottom="2dp">
+      android:paddingEnd="6dp">
     <ImageView
         android:id="@+id/widget_art"
         android:layout_width="56dp"
@@ -28,23 +26,12 @@
         android:scaleType="fitXY"
         android:contentDescription="@string/music_widget_open" />
     <LinearLayout
+        android:id="@+id/widget_title_area"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:orientation="vertical">
-      <LinearLayout
-          android:id="@+id/widget_title_area"
-          android:layout_width="match_parent"
-          android:layout_height="wrap_content"
-          android:gravity="center_vertical"
-          android:orientation="horizontal">
-        <LinearLayout
-            android:id="@+id/widget_title_col"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-          <TextView
+      <TextView
           android:id="@+id/widget_title"
           android:layout_width="match_parent"
           android:layout_height="wrap_content"
@@ -56,7 +43,7 @@
           android:textColor="#FFFFFFFF"
           android:textSize="13sp"
           android:textStyle="bold" />
-          <TextView
+      <TextView
           android:id="@+id/widget_artist"
           android:layout_width="match_parent"
           android:layout_height="wrap_content"
@@ -65,21 +52,13 @@
           android:maxLines="1"
           android:singleLine="true"
           android:text="Tap play to start music"
-          android:textColor="#CCFFFFFF"
+          android:textColor="#FFB4AEFF"
           android:textSize="11sp"
           android:textStyle="normal" />
-        </LinearLayout>
-        <ImageView
-          android:id="@+id/widget_brand"
-          android:layout_width="16dp"
-          android:layout_height="16dp"
-          android:layout_marginStart="4dp"
-          android:src="@drawable/widget_ic_note" />
-      </LinearLayout>
       <LinearLayout
         android:id="@+id/widget_progress_row"
         android:layout_width="match_parent"
-        android:layout_height="14dp"
+        android:layout_height="16dp"
         android:layout_marginTop="2dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
@@ -89,13 +68,13 @@
           android:layout_height="wrap_content"
           android:includeFontPadding="false"
           android:text="0:00"
-          android:textColor="#CCFFFFFF"
+          android:textColor="#DDFFFFFF"
           android:textSize="10sp" />
       <ProgressBar
           android:id="@+id/widget_progress"
           style="?android:attr/progressBarStyleHorizontal"
           android:layout_width="0dp"
-          android:layout_height="4dp"
+          android:layout_height="5dp"
           android:layout_marginStart="6dp"
           android:layout_marginEnd="6dp"
           android:layout_weight="1"
@@ -108,44 +87,54 @@
           android:layout_height="wrap_content"
           android:includeFontPadding="false"
           android:text="0:00"
-          android:textColor="#CCFFFFFF"
+          android:textColor="#DDFFFFFF"
           android:textSize="10sp" />
     </LinearLayout>
-      <LinearLayout
-      android:layout_width="match_parent"
-      android:layout_height="48dp"
-      android:gravity="center"
-      android:orientation="horizontal">
+    </LinearLayout>
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="52dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
       <FrameLayout
           android:id="@+id/widget_repeat"
-          android:layout_width="0dp"
-          android:layout_height="match_parent"
-          android:layout_weight="1"
+          android:layout_width="36dp"
+          android:layout_height="52dp"
           android:contentDescription="@string/music_widget_repeat">
         <ImageView
             android:id="@+id/widget_repeat_icon"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
             android:layout_gravity="center"
             android:src="@drawable/widget_ic_repeat_off" />
       </FrameLayout>
       <FrameLayout
+          android:id="@+id/widget_fav"
+          android:layout_width="36dp"
+          android:layout_height="52dp"
+          android:contentDescription="@string/music_widget_favourite">
+        <ImageView
+            android:id="@+id/widget_fav_icon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_gravity="center"
+            android:src="@drawable/widget_ic_fav" />
+      </FrameLayout>
+      <FrameLayout
           android:id="@+id/widget_prev"
-          android:layout_width="0dp"
-          android:layout_height="match_parent"
-          android:layout_weight="1"
+          android:layout_width="38dp"
+          android:layout_height="52dp"
           android:contentDescription="@string/music_widget_prev">
         <ImageView
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
             android:layout_gravity="center"
             android:src="@drawable/widget_ic_prev" />
       </FrameLayout>
       <FrameLayout
           android:id="@+id/widget_play"
-          android:layout_width="0dp"
-          android:layout_height="match_parent"
-          android:layout_weight="1.2"
+          android:layout_width="48dp"
+          android:layout_height="52dp"
           android:contentDescription="@string/music_widget_play_pause">
         <ImageView
             android:id="@+id/widget_play_icon"
@@ -158,44 +147,15 @@
       </FrameLayout>
       <FrameLayout
           android:id="@+id/widget_next"
-          android:layout_width="0dp"
-          android:layout_height="match_parent"
-          android:layout_weight="1"
+          android:layout_width="38dp"
+          android:layout_height="52dp"
           android:contentDescription="@string/music_widget_next">
         <ImageView
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
             android:layout_gravity="center"
             android:src="@drawable/widget_ic_next" />
       </FrameLayout>
-      <FrameLayout
-          android:id="@+id/widget_fav"
-          android:layout_width="0dp"
-          android:layout_height="match_parent"
-          android:layout_weight="1"
-          android:contentDescription="@string/music_widget_favourite">
-        <ImageView
-            android:id="@+id/widget_fav_icon"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
-            android:layout_gravity="center"
-            android:src="@drawable/widget_ic_fav" />
-      </FrameLayout>
-    </LinearLayout>
     </LinearLayout>
   </LinearLayout>
-
-  <FrameLayout
-      android:id="@+id/widget_fav_top"
-      android:layout_width="44dp"
-      android:layout_height="44dp"
-      android:layout_gravity="top|end"
-      android:contentDescription="@string/music_widget_favourite">
-    <ImageView
-        android:id="@+id/widget_fav_top_icon"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:layout_gravity="center"
-        android:src="@drawable/widget_ic_fav" />
-  </FrameLayout>
 </FrameLayout>
