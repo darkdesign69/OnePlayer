@@ -3,6 +3,7 @@ package app.marlboroadvance.mpvex.widget
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -73,6 +74,29 @@ class MusicWidgetLargeProvider : MusicWidgetProvider()
 
 class MusicWidgetTextProvider : MusicWidgetProvider()
 
+/** Handles the favourite and repeat buttons without opening the app. */
+class MusicWidgetActionReceiver : BroadcastReceiver() {
+  companion object {
+    const val ACTION_FAVORITE = "app.marlboroadvance.mpvex.widget.FAVORITE"
+    const val ACTION_REPEAT = "app.marlboroadvance.mpvex.widget.REPEAT"
+  }
+
+  override fun onReceive(
+    context: Context,
+    intent: Intent,
+  ) {
+    val ctx = context.applicationContext
+    try {
+      MusicController.init(ctx)
+      when (intent.action) {
+        ACTION_FAVORITE -> MusicWidgetUpdater.toggleFavorite(ctx)
+        ACTION_REPEAT -> MusicWidgetUpdater.cycleRepeat(ctx)
+      }
+    } catch (_: Throwable) {
+    }
+  }
+}
+
 /**
  * Draws all music widgets from the state of [MusicController]. The play, previous and next buttons talk
  * to the music service directly, so the app does not open. Only the cover and the title open the app.
@@ -98,6 +122,8 @@ object MusicWidgetUpdater {
     val posMs: Long,
     val durMs: Long,
     val art: Bitmap?,
+    val fav: Boolean = false,
+    val repeat: Int = 0,
   )
 
   fun update(
@@ -156,14 +182,18 @@ object MusicWidgetUpdater {
         saveArt(ctx, art)
       }
       val pos = try { MusicController.position().toLong() } catch (_: Throwable) { 0L }
+      val fav = t.id in MusicController.favorites
       prefs
         .edit()
         .putString("title", t.title)
         .putString("artist", t.artist)
         .putLong("dur", t.durationMs)
         .putLong("pos", pos)
+        .putLong("id", t.id)
+        .putBoolean("fav", fav)
+        .putInt("repeat", MusicController.repeat)
         .apply()
-      return State(true, t.title, t.artist, MusicController.isPlaying, pos, t.durationMs, art)
+      return State(true, t.title, t.artist, MusicController.isPlaying, pos, t.durationMs, art, fav, MusicController.repeat)
     }
     // Nothing loaded in this process (app was closed): show the last song, paused
     val title = prefs.getString("title", null)
@@ -180,6 +210,8 @@ object MusicWidgetUpdater {
       prefs.getLong("pos", 0L),
       prefs.getLong("dur", 0L),
       art,
+      prefs.getBoolean("fav", false),
+      prefs.getInt("repeat", 0),
     )
   }
 
@@ -208,6 +240,25 @@ object MusicWidgetUpdater {
       null
     }
 
+  // ---- favourite / repeat (used by the widget buttons) ----
+
+  fun toggleFavorite(ctx: Context) {
+    val prefs = ctx.getSharedPreferences(SNAP, Context.MODE_PRIVATE)
+    val id = MusicController.current?.id ?: prefs.getLong("id", -1L)
+    if (id < 0) return
+    // write the new state first so a widget redraw never shows the old heart
+    prefs.edit().putBoolean("fav", id !in MusicController.favorites).apply()
+    MusicController.toggleFavorite(id)
+  }
+
+  fun cycleRepeat(ctx: Context) {
+    val prefs = ctx.getSharedPreferences(SNAP, Context.MODE_PRIVATE)
+    val cur = if (MusicController.queue.isNotEmpty()) MusicController.repeat else prefs.getInt("repeat", 0)
+    val next = (cur + 1) % 3
+    prefs.edit().putInt("repeat", next).apply()
+    MusicController.setRepeatMode(next)
+  }
+
   // ---- views ----
 
   private fun build(
@@ -219,18 +270,32 @@ object MusicWidgetUpdater {
     val density = ctx.resources.displayMetrics.density
     val wDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0).takeIf { it > 0 } ?: kind.defaultWidthDp
     val hDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0).takeIf { it > 0 } ?: kind.defaultHeightDp
-    val tall = hDp >= 100 && (kind == MusicWidgetKind.Medium || kind == MusicWidgetKind.Large)
+    val wide = kind == MusicWidgetKind.Medium || kind == MusicWidgetKind.Large
+    val vertical = wide && hDp >= 130 && wDp <= hDp * 1.4f
     val layout =
       when (kind) {
         MusicWidgetKind.Small -> R.layout.widget_music_small
         MusicWidgetKind.Text -> R.layout.widget_music_text
-        else -> if (tall) R.layout.widget_music_wide_tall else R.layout.widget_music_wide
+        else -> if (vertical) R.layout.widget_music_wide_tall else R.layout.widget_music_wide
       }
     val rv = RemoteViews(ctx.packageName, layout)
+    val s31 = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
     rv.setTextViewText(R.id.widget_title, if (st.hasTrack) st.title else ctx.getString(R.string.music_widget_idle_title))
     rv.setTextViewText(R.id.widget_artist, if (st.hasTrack) st.artist else ctx.getString(R.string.music_widget_idle_artist))
     rv.setImageViewResource(R.id.widget_play_icon, if (st.playing) R.drawable.widget_ic_pause else R.drawable.widget_ic_play)
+    rv.setImageViewResource(R.id.widget_fav_top_icon, if (st.fav) R.drawable.widget_ic_fav_on else R.drawable.widget_ic_fav)
+    if (wide && !vertical) rv.setImageViewResource(R.id.widget_fav_icon, if (st.fav) R.drawable.widget_ic_fav_on else R.drawable.widget_ic_fav)
+    if (kind != MusicWidgetKind.Small) {
+      rv.setImageViewResource(
+        R.id.widget_repeat_icon,
+        when (st.repeat) {
+          1 -> R.drawable.widget_ic_repeat_all
+          2 -> R.drawable.widget_ic_repeat_one
+          else -> R.drawable.widget_ic_repeat_off
+        },
+      )
+    }
 
     // background: blurred, dark cover with rounded corners
     val scale = min(1f, 384f / max(wDp, hDp) / density)
@@ -243,55 +308,96 @@ object MusicWidgetUpdater {
       rv.setImageViewBitmap(R.id.widget_art, rounded(st.art ?: placeholderArt(ctx), 0.2f))
     }
 
-    // what fits at this size
-    if (kind == MusicWidgetKind.Medium || kind == MusicWidgetKind.Large) {
-      val artSize = if (tall) 72 else 48
-      val padH = if (tall) 20 else 12
-      val showArt = wDp >= 120
-      val column = wDp - padH - (if (showArt) artSize + 8 else 0)
-      rv.setViewVisibility(R.id.widget_art, if (showArt) View.VISIBLE else View.GONE)
-      val showTimes = column >= 150
-      rv.setViewVisibility(R.id.widget_elapsed, if (showTimes) View.VISIBLE else View.GONE)
-      rv.setViewVisibility(R.id.widget_total, if (showTimes) View.VISIBLE else View.GONE)
-      rv.setViewVisibility(R.id.widget_brand, if (column >= 90) View.VISIBLE else View.GONE)
-      val ratio = if (st.durMs > 0) (st.posMs.toFloat() / st.durMs).coerceIn(0f, 1f) else 0f
-      rv.setProgressBar(R.id.widget_progress, 1000, (ratio * 1000).toInt(), false)
-      rv.setTextViewText(R.id.widget_elapsed, fmt(st.posMs))
-      rv.setTextViewText(R.id.widget_total, fmt(st.durMs))
+    // what fits at this size (controls always keep their full tappable size)
+    val roomy = hDp >= 92 // below this a widget is one row high: title and buttons only
+    val titlePad = (36 * density).toInt()
+    when {
+      kind == MusicWidgetKind.Small -> {
+        val showArt = hDp >= 120
+        rv.setViewVisibility(R.id.widget_art, if (showArt) View.VISIBLE else View.GONE)
+        rv.setViewVisibility(R.id.widget_artist, if (hDp >= 150) View.VISIBLE else View.GONE)
+        rv.setViewVisibility(R.id.widget_fav_top, if (showArt) View.VISIBLE else View.GONE)
+      }
+      kind == MusicWidgetKind.Text -> {
+        val colW = wDp - 20
+        val showFav = roomy && wDp >= 110
+        rv.setViewVisibility(R.id.widget_artist, if (hDp >= 80) View.VISIBLE else View.GONE)
+        rv.setViewVisibility(R.id.widget_repeat, if (colW >= 200) View.VISIBLE else View.GONE)
+        rv.setViewVisibility(R.id.widget_fav_top, if (showFav) View.VISIBLE else View.GONE)
+        rv.setViewPadding(R.id.widget_title_col, 0, 0, if (showFav) titlePad else 0, 0)
+      }
+      vertical -> {
+        val colW = wDp - 24
+        rv.setViewVisibility(R.id.widget_repeat, if (colW >= 190) View.VISIBLE else View.GONE)
+        rv.setViewVisibility(R.id.widget_fav_top, View.VISIBLE)
+        rv.setViewVisibility(R.id.widget_progress_row, if (colW >= 110) View.VISIBLE else View.GONE)
+        setTimes(rv, st, colW >= 150)
+      }
+      else -> {
+        val artSize = if (s31) (hDp - 16).coerceIn(44, 140) else 56
+        val showArt = wDp >= 190
+        val colW = wDp - 14 - (if (showArt) artSize + 10 else 0)
+        val rowMode = colW >= 230 // repeat and favourite sit in the button row
+        val showFav = !rowMode && roomy && colW >= 110
+        rv.setViewVisibility(R.id.widget_art, if (showArt) View.VISIBLE else View.GONE)
+        if (showArt && s31) {
+          rv.setViewLayoutWidth(R.id.widget_art, artSize.toFloat(), TypedValue.COMPLEX_UNIT_DIP)
+          rv.setViewLayoutHeight(R.id.widget_art, artSize.toFloat(), TypedValue.COMPLEX_UNIT_DIP)
+        }
+        rv.setViewVisibility(R.id.widget_artist, if (roomy) View.VISIBLE else View.GONE)
+        rv.setViewVisibility(R.id.widget_progress_row, if (roomy && colW >= 110) View.VISIBLE else View.GONE)
+        setTimes(rv, st, colW >= 150)
+        rv.setViewVisibility(R.id.widget_repeat, if (rowMode) View.VISIBLE else View.GONE)
+        rv.setViewVisibility(R.id.widget_fav, if (rowMode) View.VISIBLE else View.GONE)
+        rv.setViewVisibility(R.id.widget_brand, if (rowMode) View.VISIBLE else View.GONE)
+        rv.setViewVisibility(R.id.widget_fav_top, if (showFav) View.VISIBLE else View.GONE)
+        rv.setViewPadding(R.id.widget_title_col, 0, 0, if (showFav) titlePad else 0, 0)
+      }
     }
 
-    if (kind == MusicWidgetKind.Small) {
-      // the small widget can be resized: show only what fits
-      rv.setViewVisibility(R.id.widget_art, if (hDp >= 100) View.VISIBLE else View.GONE)
-      rv.setViewVisibility(R.id.widget_artist, if (hDp >= 130) View.VISIBLE else View.GONE)
-    }
-    if ((kind == MusicWidgetKind.Medium || kind == MusicWidgetKind.Large) && !tall) {
-      // one row high: only the title and the buttons, so nothing is squeezed
-      val roomy = hDp >= 90
-      rv.setViewVisibility(R.id.widget_progress, if (roomy) View.VISIBLE else View.GONE)
-      rv.setViewVisibility(R.id.widget_artist, if (roomy) View.VISIBLE else View.GONE)
-    }
-    if (kind == MusicWidgetKind.Text) {
-      rv.setViewVisibility(R.id.widget_artist, if (hDp >= 80) View.VISIBLE else View.GONE)
-    }
-    if (tall && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-      // taller widget: the cover grows with the height so the widget never looks empty
-      val side = (hDp - 28).coerceIn(56, 140).toFloat()
-      rv.setViewLayoutWidth(R.id.widget_art, side, TypedValue.COMPLEX_UNIT_DIP)
-      rv.setViewLayoutHeight(R.id.widget_art, side, TypedValue.COMPLEX_UNIT_DIP)
-    }
-
-    // buttons: control the music service, the app stays closed
+    // buttons: control the music, the app stays closed
     rv.setOnClickPendingIntent(R.id.widget_play, service(ctx, MusicPlaybackService.ACTION_TOGGLE, 101))
     rv.setOnClickPendingIntent(R.id.widget_prev, service(ctx, MusicPlaybackService.ACTION_PREV, 102))
     rv.setOnClickPendingIntent(R.id.widget_next, service(ctx, MusicPlaybackService.ACTION_NEXT, 103))
+    val fav = broadcast(ctx, MusicWidgetActionReceiver.ACTION_FAVORITE, 104)
+    rv.setOnClickPendingIntent(R.id.widget_fav_top, fav)
+    if (wide && !vertical) rv.setOnClickPendingIntent(R.id.widget_fav, fav)
+    if (kind != MusicWidgetKind.Small) {
+      rv.setOnClickPendingIntent(R.id.widget_repeat, broadcast(ctx, MusicWidgetActionReceiver.ACTION_REPEAT, 105))
+    }
 
-    // only the cover and the title/artist open the app (on the Now Playing screen)
+    // everything else (background, cover, title) opens the player on the Now Playing screen
     val open = openApp(ctx)
+    rv.setOnClickPendingIntent(R.id.widget_root, open)
     rv.setOnClickPendingIntent(R.id.widget_title_area, open)
     if (kind != MusicWidgetKind.Text) rv.setOnClickPendingIntent(R.id.widget_art, open)
     return rv
   }
+
+  private fun setTimes(
+    rv: RemoteViews,
+    st: State,
+    show: Boolean,
+  ) {
+    val ratio = if (st.durMs > 0) (st.posMs.toFloat() / st.durMs).coerceIn(0f, 1f) else 0f
+    rv.setProgressBar(R.id.widget_progress, 1000, (ratio * 1000).toInt(), false)
+    rv.setTextViewText(R.id.widget_elapsed, fmt(st.posMs))
+    rv.setTextViewText(R.id.widget_total, fmt(st.durMs))
+    rv.setViewVisibility(R.id.widget_elapsed, if (show) View.VISIBLE else View.GONE)
+    rv.setViewVisibility(R.id.widget_total, if (show) View.VISIBLE else View.GONE)
+  }
+
+  private fun broadcast(
+    ctx: Context,
+    action: String,
+    code: Int,
+  ): PendingIntent =
+    PendingIntent.getBroadcast(
+      ctx,
+      code,
+      Intent(ctx, MusicWidgetActionReceiver::class.java).setAction(action),
+      PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
 
   private fun service(
     ctx: Context,
