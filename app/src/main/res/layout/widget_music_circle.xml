@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+  <ImageView
+      android:id="@+id/widget_bg"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:scaleType="fitCenter" />
+
+  <FrameLayout
+      android:id="@+id/widget_fav"
+      android:layout_width="48dp"
+      android:layout_height="48dp"
+      android:layout_gravity="top|end"
+      android:contentDescription="@string/music_widget_favourite">
+    <ImageView
+        android:id="@+id/widget_fav_icon"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_gravity="center"
+        android:background="@drawable/widget_btn_dark"
+        android:padding="8dp"
+        android:src="@drawable/widget_ic_fav" />
+  </FrameLayout>
+
+  <FrameLayout
+      android:id="@+id/widget_play"
+      android:layout_width="56dp"
+      android:layout_height="56dp"
+      android:layout_gravity="bottom|start"
+      android:contentDescription="@string/music_widget_play_pause">
+    <ImageView
+        android:id="@+id/widget_play_icon"
+        android:layout_width="46dp"
+        android:layout_height="46dp"
+        android:layout_gravity="center"
+        android:background="@drawable/widget_play_bg"
+        android:padding="11dp"
+        android:src="@drawable/widget_ic_play" />
+  </FrameLayout>
+</FrameLayout>

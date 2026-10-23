@@ -339,6 +339,30 @@
         </receiver>
 
         <receiver
+            android:name=".widget.MusicWidgetCircleProvider"
+            android:exported="true"
+            android:label="@string/music_widget_circle_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/music_widget_circle_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.MusicWidgetTextProvider"
+            android:exported="true"
+            android:label="@string/music_widget_text_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/music_widget_text_info" />
+        </receiver>
+
+        <receiver
             android:name=".widget.MusicWidgetActionReceiver"
             android:exported="false" />
 

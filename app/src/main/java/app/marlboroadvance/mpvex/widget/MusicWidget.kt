@@ -45,6 +45,8 @@ enum class MusicWidgetKind(
   Medium(150, 150),
   Wide(320, 70),
   Large(320, 150),
+  Circle(110, 110),
+  Text(250, 66),
 }
 
 /** The layout a widget uses at its current size. Every widget can be resized into any of them. */
@@ -91,6 +93,10 @@ class MusicWidgetMediumProvider : MusicWidgetProvider()
 class MusicWidgetWideProvider : MusicWidgetProvider()
 
 class MusicWidgetLargeProvider : MusicWidgetProvider()
+
+class MusicWidgetCircleProvider : MusicWidgetProvider()
+
+class MusicWidgetTextProvider : MusicWidgetProvider()
 
 /** Handles the favourite and repeat buttons without opening the app. */
 class MusicWidgetActionReceiver : BroadcastReceiver() {
@@ -168,6 +174,8 @@ object MusicWidgetUpdater {
       MusicWidgetKind.Medium to MusicWidgetMediumProvider::class.java,
       MusicWidgetKind.Wide to MusicWidgetWideProvider::class.java,
       MusicWidgetKind.Large to MusicWidgetLargeProvider::class.java,
+      MusicWidgetKind.Circle to MusicWidgetCircleProvider::class.java,
+      MusicWidgetKind.Text to MusicWidgetTextProvider::class.java,
     )
 
   private fun render(ctx: Context) {
@@ -290,6 +298,8 @@ object MusicWidgetUpdater {
     val density = ctx.resources.displayMetrics.density
     val wDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0).takeIf { it > 0 } ?: kind.defaultWidthDp
     val hDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0).takeIf { it > 0 } ?: kind.defaultHeightDp
+    if (kind == MusicWidgetKind.Circle) return buildCircle(ctx, wDp, hDp, st)
+    if (kind == MusicWidgetKind.Text) return buildText(ctx, wDp, hDp, st)
     val shape = shapeFor(wDp, hDp)
     val layout =
       when (shape) {
@@ -311,12 +321,13 @@ object MusicWidgetUpdater {
     val radius = 16f * density * scale
     val stroke = 1.2f * density * scale
     val cover = st.art ?: placeholderArt(ctx)
+    val blur = blurOf(st.art)
     val bg =
       when (shape) {
-        WidgetShape.Tiny -> hero(cover, bgW, bgH, radius, stroke, 0xB4)
-        WidgetShape.Square -> hero(cover, bgW, bgH, radius, stroke, 0xE8)
-        WidgetShape.Compact -> compactCard(cover, bgW, bgH, radius, stroke)
-        else -> glass(blurOf(st.art), bgW, bgH, radius, stroke)
+        WidgetShape.Tiny -> blurHero(cover, blur, bgW, bgH, radius, stroke, 0.74f, 0.5f)
+        WidgetShape.Square -> blurHero(cover, blur, bgW, bgH, radius, stroke, 0.52f, 0.07f)
+        WidgetShape.Compact -> blurCompact(cover, blur, bgW, bgH, radius, stroke)
+        else -> glass(blur, bgW, bgH, radius, stroke)
       }
     rv.setImageViewBitmap(R.id.widget_bg, bg)
 
@@ -670,6 +681,117 @@ object MusicWidgetUpdater {
     c.drawRoundRect(rect, radius, radius, p)
     border(c, rect, radius, stroke)
     return out
+  }
+
+  /** Blurred cover everywhere, with the sharp cover drawn on top (for the small and square widgets). */
+  private fun blurHero(
+    cover: Bitmap,
+    blur: Bitmap?,
+    w: Int,
+    h: Int,
+    radius: Float,
+    stroke: Float,
+    coverFraction: Float,
+    topMargin: Float,
+  ): Bitmap {
+    val out = glass(blur, w, h, radius, stroke)
+    val pad = min(w, h) * 0.07f
+    val side = min(w - 2 * pad, h * coverFraction).coerceAtLeast(8f)
+    val x = (w - side) / 2f
+    val y = if (topMargin >= 0.5f) (h - side) / 2f else pad + (h * topMargin - pad).coerceAtLeast(0f)
+    val shown = rounded(squareCrop(cover, side.toInt().coerceAtLeast(8)), 0.14f)
+    Canvas(out).drawBitmap(shown, x, y, Paint(Paint.FILTER_BITMAP_FLAG))
+    return out
+  }
+
+  /** Blurred cover everywhere, with the sharp cover flush on the left (for thin widgets). */
+  private fun blurCompact(
+    cover: Bitmap,
+    blur: Bitmap?,
+    w: Int,
+    h: Int,
+    radius: Float,
+    stroke: Float,
+  ): Bitmap {
+    val out = glass(blur, w, h, radius, stroke)
+    val c = Canvas(out)
+    val side = min(w, h)
+    val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    p.shader = BitmapShader(centerCrop(cover, side, side), Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+    c.drawRoundRect(RectF(0f, 0f, side.toFloat(), side.toFloat()), radius, radius, p)
+    c.drawRect(RectF(side / 2f, 0f, side.toFloat(), side.toFloat()), p)
+    return out
+  }
+
+  /** Round disc: blurred cover as the ring, sharp cover in the middle. */
+  private fun circleDisc(
+    cover: Bitmap,
+    blur: Bitmap?,
+    size: Int,
+  ): Bitmap {
+    val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val c = Canvas(out)
+    val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    val r = size / 2f
+    p.shader = BitmapShader(centerCrop(blur ?: cover, size, size), Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+    c.drawCircle(r, r, r, p)
+    p.shader = null
+    p.color = 0x66000000
+    c.drawCircle(r, r, r, p)
+    val inner = (size * 0.8f).toInt().coerceAtLeast(8)
+    p.shader = BitmapShader(centerCrop(cover, inner, inner), Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+    c.save()
+    c.translate((size - inner) / 2f, (size - inner) / 2f)
+    c.drawCircle(inner / 2f, inner / 2f, inner / 2f, p)
+    c.restore()
+    return out
+  }
+
+  private fun buildCircle(
+    ctx: Context,
+    wDp: Int,
+    hDp: Int,
+    st: State,
+  ): RemoteViews {
+    val density = ctx.resources.displayMetrics.density
+    val rv = RemoteViews(ctx.packageName, R.layout.widget_music_circle)
+    val sideDp = min(wDp, hDp)
+    val px = (sideDp * density).toInt().coerceIn(96, 480)
+    rv.setImageViewBitmap(R.id.widget_bg, circleDisc(st.art ?: placeholderArt(ctx), blurOf(st.art), px))
+    rv.setImageViewResource(R.id.widget_play_icon, if (st.playing) R.drawable.widget_ic_pause else R.drawable.widget_ic_play)
+    rv.setImageViewResource(R.id.widget_fav_icon, if (st.fav) R.drawable.widget_ic_fav_on else R.drawable.widget_ic_fav)
+    rv.setViewVisibility(R.id.widget_fav, if (sideDp >= 90) View.VISIBLE else View.GONE)
+    rv.setOnClickPendingIntent(R.id.widget_play, service(ctx, MusicPlaybackService.ACTION_TOGGLE, 101))
+    rv.setOnClickPendingIntent(R.id.widget_fav, broadcast(ctx, MusicWidgetActionReceiver.ACTION_FAVORITE, 104))
+    rv.setOnClickPendingIntent(R.id.widget_root, openApp(ctx))
+    return rv
+  }
+
+  private fun buildText(
+    ctx: Context,
+    wDp: Int,
+    hDp: Int,
+    st: State,
+  ): RemoteViews {
+    val density = ctx.resources.displayMetrics.density
+    val rv = RemoteViews(ctx.packageName, R.layout.widget_music_text)
+    val scale = min(1f, 480f / max(wDp, hDp) / density)
+    val bgW = max(1, (wDp * density * scale).toInt())
+    val bgH = max(1, (hDp * density * scale).toInt())
+    rv.setImageViewBitmap(R.id.widget_bg, glass(blurOf(st.art), bgW, bgH, 16f * density * scale, 1.2f * density * scale))
+    rv.setTextViewText(R.id.widget_title, if (st.hasTrack) st.title else ctx.getString(R.string.music_widget_idle_title))
+    rv.setTextViewText(R.id.widget_artist, if (st.hasTrack) st.artist else ctx.getString(R.string.music_widget_idle_artist))
+    rv.setViewVisibility(R.id.widget_artist, if (hDp >= 56) View.VISIBLE else View.GONE)
+    rv.setViewVisibility(R.id.widget_prev, if (wDp >= 170) View.VISIBLE else View.GONE)
+    rv.setViewVisibility(R.id.widget_next, if (wDp >= 170) View.VISIBLE else View.GONE)
+    rv.setImageViewResource(R.id.widget_play_icon, if (st.playing) R.drawable.widget_ic_pause else R.drawable.widget_ic_play)
+    rv.setOnClickPendingIntent(R.id.widget_play, service(ctx, MusicPlaybackService.ACTION_TOGGLE, 101))
+    rv.setOnClickPendingIntent(R.id.widget_prev, service(ctx, MusicPlaybackService.ACTION_PREV, 102))
+    rv.setOnClickPendingIntent(R.id.widget_next, service(ctx, MusicPlaybackService.ACTION_NEXT, 103))
+    val open = openApp(ctx)
+    rv.setOnClickPendingIntent(R.id.widget_root, open)
+    rv.setOnClickPendingIntent(R.id.widget_title_area, open)
+    return rv
   }
 
   // ---- blur ----
