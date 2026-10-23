@@ -559,9 +559,16 @@ object MusicController {
     }
   }
 
-  fun cycleRepeat() {
-    repeat = (repeat + 1) % 3
-    saveQueueState()
+  fun cycleRepeat() = setRepeatMode((repeat + 1) % 3)
+
+  /** 0 = off, 1 = repeat all, 2 = repeat one. Also used by the home screen widget. */
+  fun setRepeatMode(mode: Int) {
+    repeat = mode.coerceIn(0, 2)
+    if (initialised) {
+      app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt("q_repeat", repeat).apply()
+      saveQueueState()
+      MusicWidgetUpdater.update(app)
+    }
   }
 
   fun changeSpeed(value: Float) {
@@ -652,6 +659,7 @@ object MusicController {
   fun toggleFavorite(id: Long) {
     favorites = if (id in favorites) favorites - id else favorites + id
     savePrefs()
+    MusicWidgetUpdater.update(app)
   }
 
   private fun addHistory(id: Long) {

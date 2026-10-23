@@ -338,6 +338,10 @@
                 android:resource="@xml/music_widget_text_info" />
         </receiver>
 
+        <receiver
+            android:name=".widget.MusicWidgetActionReceiver"
+            android:exported="false" />
+
         <!-- Media scan receiver to detect when new videos are added -->
         <receiver
             android:name=".utils.media.MediaScanReceiver"
