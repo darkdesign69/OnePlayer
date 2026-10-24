@@ -544,6 +544,25 @@ object MusicController {
 
   fun toggleShuffle() {
     shuffle = !shuffle
+    reorderForShuffle()
+    if (initialised) {
+      app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("q_shuffle", shuffle).apply()
+      saveQueueState()
+      MusicWidgetUpdater.update(app)
+    }
+  }
+
+  /** Sets shuffle on or off (used by the home screen widget, also works when nothing is loaded). */
+  fun setShuffleMode(on: Boolean) {
+    if (shuffle != on) {
+      toggleShuffle()
+    } else if (initialised) {
+      app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("q_shuffle", on).apply()
+      MusicWidgetUpdater.update(app)
+    }
+  }
+
+  private fun reorderForShuffle() {
     val cur = current ?: return
     if (shuffle) {
       val rest = queue.filter { it.id != cur.id }.shuffled()
