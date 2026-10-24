@@ -1,9 +1,9 @@
 <resources>
-  <string name="music_widget_small_label" translatable="false">Music player (1x1)</string>
-  <string name="music_widget_medium_label" translatable="false">Music player (2x2)</string>
-  <string name="music_widget_large_label" translatable="false">Music player (4x2)</string>
-  <string name="music_widget_wide_label" translatable="false">Music player (4x1)</string>
-  <string name="music_widget_text_label" translatable="false">Music player (text only)</string>
+  <string name="music_widget_capsule_label" translatable="false">Slim Capsule Player</string>
+  <string name="music_widget_square_label" translatable="false">Square Cover Player</string>
+  <string name="music_widget_mini_label" translatable="false">Mini Controller</string>
+  <string name="music_widget_album_label" translatable="false">Horizontal Album Player</string>
+  <string name="music_widget_expanded_label" translatable="false">Expanded Progress Player</string>
   <string name="music_widget_description" translatable="false">Play and control your music. Tap anywhere except the buttons to open the player.</string>
   <string name="music_widget_idle_title" translatable="false">One Player</string>
   <string name="music_widget_idle_artist" translatable="false">Tap play to start music</string>
@@ -13,10 +13,5 @@
   <string name="music_widget_open" translatable="false">Open app</string>
   <string name="music_widget_favourite" translatable="false">Favourite</string>
   <string name="music_widget_repeat" translatable="false">Repeat / play all</string>
-  <string name="music_widget_capsule_label" translatable="false">Slim Capsule Player</string>
-  <string name="music_widget_square_label" translatable="false">Square Cover Player</string>
-  <string name="music_widget_mini_label" translatable="false">Mini Controller</string>
-  <string name="music_widget_album_label" translatable="false">Horizontal Album Player</string>
-  <string name="music_widget_expanded_label" translatable="false">Expanded Progress Player</string>
   <string name="music_widget_shuffle" translatable="false">Shuffle</string>
 </resources>
