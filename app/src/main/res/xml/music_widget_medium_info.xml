@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/music_widget_description"
+    android:initialLayout="@layout/widget_music_row"
+    android:previewLayout="@layout/widget_music_row"
+    android:minWidth="144dp"
+    android:minHeight="72dp"
+    android:minResizeWidth="144dp"
+    android:minResizeHeight="72dp"
+    android:maxResizeWidth="288dp"
+    android:maxResizeHeight="144dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="1"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen" />
