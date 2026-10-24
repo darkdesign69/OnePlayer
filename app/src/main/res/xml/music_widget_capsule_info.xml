@@ -5,7 +5,7 @@
     android:previewLayout="@layout/widget_music_capsule"
     android:minWidth="250dp"
     android:minHeight="40dp"
-    android:minResizeWidth="40dp"
+    android:minResizeWidth="60dp"
     android:minResizeHeight="40dp"
     android:maxResizeWidth="700dp"
     android:maxResizeHeight="600dp"
