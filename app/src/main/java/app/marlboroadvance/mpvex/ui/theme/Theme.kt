@@ -275,9 +275,11 @@ fun MpvexTheme(
             accentScheme
         }
 
+    // The same Box always wraps the app. Before, the app was drawn directly when no background was
+    // set and inside a Box when one was, so picking a picture rebuilt the whole app and sent you home.
     val themedContent: @Composable () -> Unit = {
-        if (backgroundActive) {
-            Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (backgroundActive) {
                 CustomBackgroundLayer(
                     mode = customBackground,
                     version = customBackgroundVersion,
@@ -290,9 +292,7 @@ fun MpvexTheme(
                             .fillMaxSize()
                             .background(backgroundScrim(baseColorScheme.background, accentColor)),
                 )
-                content()
             }
-        } else {
             content()
         }
     }
