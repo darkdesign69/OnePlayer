@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -16,7 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 /**
- * A card container for grouping related preferences, mimicking modern Android settings UI.
+ * A flat card for grouping related preferences: a soft tonal container with no shadow.
  */
 @Composable
 fun PreferenceCard(
@@ -26,10 +25,10 @@ fun PreferenceCard(
   Card(
     modifier = modifier
       .fillMaxWidth()
-      .padding(horizontal = 16.dp, vertical = 8.dp),
-    shape = RoundedCornerShape(28.dp),
+      .padding(horizontal = 16.dp, vertical = 6.dp),
+    shape = MaterialTheme.shapes.extraLarge,
     colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.surfaceContainer,
+      containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ),
     elevation = CardDefaults.cardElevation(
       defaultElevation = 0.dp,
@@ -45,15 +44,15 @@ fun PreferenceCard(
 }
 
 /**
- * A divider to separate preferences within a card.
+ * A divider to separate preferences within a card (very light, inset).
  */
 @Composable
 fun PreferenceDivider(
   modifier: Modifier = Modifier,
 ) {
   HorizontalDivider(
-    modifier = modifier.padding(horizontal = 16.dp),
-    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+    modifier = modifier.padding(horizontal = 20.dp),
+    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
   )
 }
 
@@ -69,6 +68,6 @@ fun PreferenceSectionHeader(
     text = title,
     style = MaterialTheme.typography.labelLarge,
     color = MaterialTheme.colorScheme.primary,
-    modifier = modifier.padding(horizontal = 32.dp, vertical = 16.dp),
+    modifier = modifier.padding(start = 28.dp, end = 28.dp, top = 20.dp, bottom = 8.dp),
   )
 }

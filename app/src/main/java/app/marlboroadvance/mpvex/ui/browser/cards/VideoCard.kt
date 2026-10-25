@@ -109,7 +109,7 @@ fun VideoCard(
           . fillMaxWidth()
           .background(
             if (isSelected) {
-              MaterialTheme.colorScheme.tertiary. copy(alpha = 0.3f)
+              MaterialTheme.colorScheme.secondaryContainer
             } else {
               Color. Transparent
             },
@@ -377,7 +377,7 @@ fun VideoCard(
             .fillMaxWidth()
             .background(
               if (isSelected) {
-                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
+                MaterialTheme.colorScheme.secondaryContainer
               } else {
                 Color.Transparent
               },

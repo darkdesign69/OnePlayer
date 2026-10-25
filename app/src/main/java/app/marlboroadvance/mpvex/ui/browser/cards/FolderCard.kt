@@ -89,7 +89,7 @@ fun FolderCard(
         modifier = Modifier
           . fillMaxWidth()
           .background(
-            if (isSelected) MaterialTheme.colorScheme.tertiary. copy(alpha = 0.3f) else Color.Transparent,
+            if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
           )
           .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -212,7 +212,7 @@ fun FolderCard(
           Modifier
             .fillMaxWidth()
             .background(
-              if (isSelected) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f) else Color.Transparent,
+              if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
             )
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,

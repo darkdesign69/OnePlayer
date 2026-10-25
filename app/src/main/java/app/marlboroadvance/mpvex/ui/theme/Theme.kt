@@ -226,7 +226,7 @@ fun MpvexTheme(
         DarkMode.System -> darkTheme
     }
 
-    val baseColorScheme = when {
+    val rawColorScheme = when {
         appTheme.isDynamic && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             when {
                 useDarkTheme && amoledMode -> {
@@ -250,6 +250,9 @@ fun MpvexTheme(
         useDarkTheme -> appTheme.getDarkColorScheme()
         else -> appTheme.getLightColorScheme()
     }
+
+    // Minimal look: calmer, more neutral surfaces for every theme (accent colours stay as they are)
+    val baseColorScheme = rawColorScheme.withNeutralSurfaces()
 
     // Customize Theme: accent colour and optional background picture/colour
     val accentColor by preferences.customAccent.collectAsState()
@@ -302,6 +305,7 @@ fun MpvexTheme(
         ThemeTransitionContent {
             MaterialTheme(
                 colorScheme = colorScheme,
+                shapes = AppShapes,
                 typography = AppTypography,
                 content = { app.marlboroadvance.mpvex.ui.browser.music.MusicTypographyTheme(themedContent) },
                 motionScheme = MotionScheme.expressive(),
