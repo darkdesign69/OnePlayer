@@ -14,6 +14,12 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.runtime.key
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -42,6 +48,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -1086,41 +1093,163 @@ private fun SongRow(
   if (showTags) TagEditorDialog(track) { showTags = false }
 }
 
-/** Edit title, artist and album of a song. */
+/** Full-screen Tag editor: cover, title, album, artist, composer, genres, year, track and disc numbers, lyrics. */
 @Composable
 internal fun TagEditorDialog(
   track: MusicTrack,
   onDismiss: () -> Unit,
 ) {
+  Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    TagEditorScreen(track, onDismiss)
+  }
+}
+
+@Composable
+private fun TagEditorScreen(
+  track: MusicTrack,
+  onClose: () -> Unit,
+) {
   val ctx = LocalContext.current
+  val saved = remember(track.id) { MusicTagEdits.get(ctx, track.id) }
+  fun v(key: String) = saved.optString(key, "")
   var title by remember(track.id) { mutableStateOf(track.title) }
-  var artist by remember(track.id) { mutableStateOf(track.artist) }
   var album by remember(track.id) { mutableStateOf(track.album) }
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    title = { Text("Tag editor") },
-    text = {
-      Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(value = artist, onValueChange = { artist = it }, label = { Text("Artist") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(value = album, onValueChange = { album = it }, label = { Text("Album") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+  var artist by remember(track.id) { mutableStateOf(track.artist) }
+  var albumArtist by remember(track.id) { mutableStateOf(v("albumArtist")) }
+  var composer by remember(track.id) { mutableStateOf(v("composer")) }
+  var genres by remember(track.id) { mutableStateOf(v("genres")) }
+  var year by remember(track.id) { mutableStateOf(v("year")) }
+  var trackNo by remember(track.id) { mutableStateOf(v("trackNo")) }
+  var trackTotal by remember(track.id) { mutableStateOf(v("trackTotal")) }
+  var discNo by remember(track.id) { mutableStateOf(v("discNo")) }
+  var discTotal by remember(track.id) { mutableStateOf(v("discTotal")) }
+  var lyrics by remember(track.id) { mutableStateOf("") }
+  var lyricsLoaded by remember(track.id) { mutableStateOf("") }
+  var coverTick by remember { mutableIntStateOf(0) }
+  LaunchedEffect(track.id) {
+    val t = withContext(Dispatchers.IO) { LyricsStore.load(ctx, track) } ?: ""
+    lyrics = t
+    lyricsLoaded = t
+  }
+  val pick =
+    rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+      if (uri != null) {
+        if (MusicTagEdits.setCover(ctx, track.id, uri)) {
+          coverTick++
+          MusicController.libraryVersion++
+        } else {
+          Toast.makeText(ctx, "Could not use that picture", Toast.LENGTH_SHORT).show()
+        }
       }
-    },
-    confirmButton = {
-      TextButton(
+    }
+  val num = KeyboardOptions(keyboardType = KeyboardType.Number)
+
+  @Composable
+  fun field(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+    keyboard: KeyboardOptions = KeyboardOptions.Default,
+    single: Boolean = true,
+    onChange: (String) -> Unit,
+  ) = OutlinedTextField(
+    value = value,
+    onValueChange = onChange,
+    label = { Text(label) },
+    singleLine = single,
+    keyboardOptions = keyboard,
+    modifier = modifier,
+  )
+
+  Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+    Box(modifier = Modifier.fillMaxSize()) {
+      Column(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
+        Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+          IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+          Text("Tag editor", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 12.dp))
+        }
+        Column(
+          modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
+          verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+          Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box {
+              key(coverTick) { TrackArt(track, 400, Modifier.size(160.dp), RoundedCornerShape(16.dp)) }
+              Row(modifier = Modifier.align(Alignment.TopCenter).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FilledTonalIconButton(onClick = { pick.launch("image/*") }, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Edit, "Change cover") }
+                FilledTonalIconButton(
+                  onClick = {
+                    MusicTagEdits.removeCover(ctx, track.id)
+                    coverTick++
+                    MusicController.libraryVersion++
+                  },
+                  modifier = Modifier.size(44.dp),
+                ) { Icon(Icons.Filled.Delete, "Remove cover") }
+              }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+              Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+              Text(artist, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+          }
+          Spacer(Modifier.height(4.dp))
+          field("Title", title) { title = it }
+          field("Album", album) { album = it }
+          field("Artist", artist) { artist = it }
+          field("Album artist", albumArtist) { albumArtist = it }
+          field("Composer", composer) { composer = it }
+          field("Genres", genres) { genres = it }
+          field("Year", year, keyboard = num) { year = it }
+          Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            field("Track number", trackNo, Modifier.weight(1f), num) { trackNo = it }
+            field("Track total", trackTotal, Modifier.weight(1f), num) { trackTotal = it }
+          }
+          Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            field("Disc number", discNo, Modifier.weight(1f), num) { discNo = it }
+            field("Disc total", discTotal, Modifier.weight(1f), num) { discTotal = it }
+          }
+          OutlinedTextField(
+            value = lyrics,
+            onValueChange = { lyrics = it },
+            label = { Text("Lyrics") },
+            minLines = 4,
+            maxLines = 10,
+            modifier = Modifier.fillMaxWidth(),
+          )
+          Spacer(Modifier.height(96.dp))
+        }
+      }
+      FloatingActionButton(
         onClick = {
           val t = title.trim().ifBlank { track.title }
           val a = artist.trim().ifBlank { track.artist }
           val al = album.trim().ifBlank { track.album }
-          MusicTagEdits.save(ctx, track, t, a, al)
+          MusicTagEdits.save(
+            ctx,
+            track,
+            mapOf(
+              "title" to t,
+              "artist" to a,
+              "album" to al,
+              "albumArtist" to albumArtist.trim(),
+              "composer" to composer.trim(),
+              "genres" to genres.trim(),
+              "year" to year.trim(),
+              "trackNo" to trackNo.trim(),
+              "trackTotal" to trackTotal.trim(),
+              "discNo" to discNo.trim(),
+              "discTotal" to discTotal.trim(),
+            ),
+          )
+          if (lyrics != lyricsLoaded) LyricsStore.save(ctx, track, lyrics)
           MusicController.applyTagEdit(track.copy(title = t, artist = a, album = al))
           Toast.makeText(ctx, "Tags saved", Toast.LENGTH_SHORT).show()
-          onDismiss()
+          onClose()
         },
-      ) { Text("Save") }
-    },
-    dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-  )
+        modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().imePadding().padding(20.dp),
+      ) { Icon(Icons.Filled.Save, "Save") }
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1563,7 +1692,7 @@ internal fun TrackArt(
     } else {
       shape
     }
-  val bmp by produceState<Bitmap?>(null, track?.id, size) {
+  val bmp by produceState<Bitmap?>(null, track?.id, size, MusicController.libraryVersion) {
     value = if (track == null) null else withContext(Dispatchers.IO) { loadArt(context, track, size) }
   }
   Box(
