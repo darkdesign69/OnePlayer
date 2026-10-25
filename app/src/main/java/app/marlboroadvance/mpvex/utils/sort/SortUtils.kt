@@ -22,6 +22,14 @@ object SortUtils {
         VideoSortType.Duration -> videos.sortedBy { it.duration }
         VideoSortType.Date -> videos.sortedBy { it.dateModified }
         VideoSortType.Size -> videos.sortedBy { it.size }
+        VideoSortType.Resolution -> videos.sortedBy { it.width.toLong() * it.height.toLong() }
+        VideoSortType.FrameRate -> videos.sortedBy { it.fps }
+        VideoSortType.Path -> videos.sortedWith { t1, t2 -> NaturalOrderComparator.DEFAULT.compare(t1.path, t2.path) }
+        VideoSortType.Type ->
+          videos.sortedWith(
+            compareBy<Video> { it.displayName.substringAfterLast('.', "").lowercase() }
+              .thenComparator { t1, t2 -> NaturalOrderComparator.DEFAULT.compare(t1.displayName, t2.displayName) },
+          )
       }
     return if (sortOrder.isAscending) sorted else sorted.reversed()
   }

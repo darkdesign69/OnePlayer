@@ -83,6 +83,7 @@ fun VideoCard(
   val showResolutionChipPref by browserPreferences.showResolutionChip.collectAsState()
   val showFramerateInResolution by browserPreferences.showFramerateInResolution.collectAsState()
   val showProgressBar by browserPreferences.showProgressBar.collectAsState()
+  val showDurationOverlay by browserPreferences.showDurationOverlay.collectAsState()
   val showDateChip by browserPreferences.showDateChip.collectAsState()
   val showUnplayedOldVideoLabel by appearancePreferences.showUnplayedOldVideoLabel.collectAsState()
   val maxLines = if (unlimitedNameLines) Int.MAX_VALUE else 2
@@ -220,7 +221,7 @@ fun VideoCard(
 
 
           // Duration overlay
-          Box(
+          if (showDurationOverlay) Box(
             modifier = Modifier
               .align(Alignment. BottomEnd)
               .padding(6.dp)
@@ -492,7 +493,7 @@ fun VideoCard(
 
 
           // Duration timestamp overlay at bottom-right of the thumbnail
-          Box(
+          if (showDurationOverlay) Box(
             modifier =
               Modifier
                 .align(Alignment.BottomEnd)

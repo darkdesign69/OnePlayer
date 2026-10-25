@@ -32,7 +32,11 @@ import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.HighQuality
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Title
@@ -951,6 +955,7 @@ private fun VideoSortDialog(
   val showResolutionChip by browserPreferences.showResolutionChip.collectAsState()
   val showFramerateInResolution by browserPreferences.showFramerateInResolution.collectAsState()
   val showProgressBar by browserPreferences.showProgressBar.collectAsState()
+  val showDurationOverlay by browserPreferences.showDurationOverlay.collectAsState()
   val showDateChip by browserPreferences.showDateChip.collectAsState()
   val showSubtitleIndicator by browserPreferences.showSubtitleIndicator.collectAsState()
   val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
@@ -1001,6 +1006,10 @@ private fun VideoSortDialog(
         VideoSortType.Duration.displayName,
         VideoSortType.Date.displayName,
         VideoSortType.Size.displayName,
+        VideoSortType.Resolution.displayName,
+        VideoSortType.FrameRate.displayName,
+        VideoSortType.Path.displayName,
+        VideoSortType.Type.displayName,
       ),
     icons =
       listOf(
@@ -1008,6 +1017,10 @@ private fun VideoSortDialog(
         Icons.Filled.AccessTime,
         Icons.Filled.CalendarToday,
         Icons.Filled.SwapVert,
+        Icons.Filled.HighQuality,
+        Icons.Filled.Speed,
+        Icons.Filled.Folder,
+        Icons.Filled.Description,
       ),
     getLabelForType = { type, _ ->
       when (type) {
@@ -1015,6 +1028,10 @@ private fun VideoSortDialog(
         VideoSortType.Duration.displayName -> Pair("Shortest", "Longest")
         VideoSortType.Date.displayName -> Pair("Oldest", "Newest")
         VideoSortType.Size.displayName -> Pair("Smallest", "Biggest")
+        VideoSortType.Resolution.displayName -> Pair("Lowest", "Highest")
+        VideoSortType.FrameRate.displayName -> Pair("Slowest", "Fastest")
+        VideoSortType.Path.displayName -> Pair("A-Z", "Z-A")
+        VideoSortType.Type.displayName -> Pair("A-Z", "Z-A")
         else -> Pair("Asc", "Desc")
       }
     },
@@ -1092,6 +1109,19 @@ private fun VideoSortDialog(
           label = "Date",
           checked = showDateChip,
           onCheckedChange = { browserPreferences.showDateChip.set(it) },
+        ),
+      ),
+    advancedToggles =
+      listOf(
+        VisibilityToggle(
+          label = "Display length over thumbnail",
+          checked = showDurationOverlay,
+          onCheckedChange = { browserPreferences.showDurationOverlay.set(it) },
+        ),
+        VisibilityToggle(
+          label = "Show watch progress bar",
+          checked = showProgressBar,
+          onCheckedChange = { browserPreferences.showProgressBar.set(it) },
         ),
       ),
     folderGridColumnSelector = folderGridColumnSelector,
