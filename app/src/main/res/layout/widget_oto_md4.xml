@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/o_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+  <ImageView
+      android:id="@+id/o_bg"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:scaleType="fitXY" />
+
+  <LinearLayout
+      android:id="@+id/o_content"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:gravity="center_vertical"
+      android:orientation="horizontal"
+      android:padding="6dp">
+    <ImageView
+        android:id="@+id/o_art"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_marginEnd="10dp"
+        android:adjustViewBounds="true"
+        android:contentDescription="@string/music_widget_open"
+        android:scaleType="fitCenter" />
+    <LinearLayout
+        android:id="@+id/o_title_area"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:gravity="center_vertical"
+        android:orientation="vertical">
+      <TextView
+          android:id="@+id/o_title"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:ellipsize="end"
+          android:gravity="start"
+          android:includeFontPadding="false"
+          android:maxLines="2"
+          android:text="One Player"
+          android:textSize="15sp"
+          android:textStyle="bold" />
+      <TextView
+          android:id="@+id/o_artist"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="1dp"
+          android:ellipsize="end"
+          android:gravity="start"
+          android:includeFontPadding="false"
+          android:maxLines="1"
+          android:text="Tap play to start music"
+          android:textSize="12sp"
+          android:textStyle="normal" />
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/o_controls"
+        android:layout_width="wrap_content"
+        android:layout_height="46dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+      <FrameLayout
+          android:id="@+id/o_shuffle"
+          android:layout_width="36dp"
+          android:layout_height="46dp"
+          android:contentDescription="@string/music_widget_shuffle">
+        <ImageView
+            android:id="@+id/o_shuffle_icon"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter" />
+      </FrameLayout>
+      <FrameLayout
+          android:id="@+id/o_repeat"
+          android:layout_width="36dp"
+          android:layout_height="46dp"
+          android:contentDescription="@string/music_widget_repeat">
+        <ImageView
+            android:id="@+id/o_repeat_icon"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter" />
+      </FrameLayout>
+      <FrameLayout
+          android:id="@+id/o_fav"
+          android:layout_width="44dp"
+          android:layout_height="46dp"
+          android:contentDescription="@string/music_widget_favourite">
+        <ImageView
+            android:id="@+id/o_fav_icon"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter" />
+      </FrameLayout>
+      <FrameLayout
+          android:id="@+id/o_prev"
+          android:layout_width="40dp"
+          android:layout_height="46dp"
+          android:contentDescription="@string/music_widget_prev">
+        <ImageView
+            android:id="@+id/o_prev_icon"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter" />
+      </FrameLayout>
+      <FrameLayout
+          android:id="@+id/o_play"
+          android:layout_width="72dp"
+          android:layout_height="46dp"
+          android:contentDescription="@string/music_widget_play_pause">
+        <ImageView
+            android:id="@+id/o_play_icon"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter" />
+      </FrameLayout>
+      <FrameLayout
+          android:id="@+id/o_next"
+          android:layout_width="40dp"
+          android:layout_height="46dp"
+          android:contentDescription="@string/music_widget_next">
+        <ImageView
+            android:id="@+id/o_next_icon"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter" />
+      </FrameLayout>
+    </LinearLayout>
+  </LinearLayout>
+</FrameLayout>
