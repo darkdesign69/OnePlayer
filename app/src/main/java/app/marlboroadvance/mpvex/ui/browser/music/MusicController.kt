@@ -62,6 +62,61 @@ data class MusicTrack(
   val uri: Uri,
 )
 
+/** Title / artist / album the user changed in the Tag editor. Kept in the app, and applied whenever the library loads. */
+object MusicTagEdits {
+  private const val PREFS = "music_tag_edits"
+
+  private fun read(ctx: Context): JSONObject =
+    try {
+      JSONObject(ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("edits", "{}") ?: "{}")
+    } catch (_: Exception) {
+      JSONObject()
+    }
+
+  fun apply(
+    ctx: Context,
+    tracks: List<MusicTrack>,
+  ): List<MusicTrack> {
+    val all = read(ctx)
+    if (all.length() == 0) return tracks
+    return tracks.map { t ->
+      val e = all.optJSONObject(t.id.toString()) ?: return@map t
+      t.copy(
+        title = e.optString("title", t.title).ifBlank { t.title },
+        artist = e.optString("artist", t.artist).ifBlank { t.artist },
+        album = e.optString("album", t.album).ifBlank { t.album },
+      )
+    }
+  }
+
+  /** Remembers the new tags and also asks Android's media library to take them (works where the system allows it). */
+  fun save(
+    ctx: Context,
+    track: MusicTrack,
+    title: String,
+    artist: String,
+    album: String,
+  ) {
+    val all = read(ctx)
+    all.put(
+      track.id.toString(),
+      JSONObject().put("title", title).put("artist", artist).put("album", album),
+    )
+    ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("edits", all.toString()).apply()
+    try {
+      val v =
+        android.content.ContentValues().apply {
+          put(MediaStore.Audio.Media.TITLE, title)
+          put(MediaStore.Audio.Media.ARTIST, artist)
+          put(MediaStore.Audio.Media.ALBUM, album)
+        }
+      ctx.contentResolver.update(track.uri, v, null, null)
+    } catch (_: Exception) {
+      // not allowed on this Android version: the app's own copy above is used instead
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Album art (cached)
 // ---------------------------------------------------------------------------------------------
@@ -177,9 +232,10 @@ fun loadMusicTracks(context: Context): List<MusicTrack> {
   } catch (_: Exception) {
     // empty list => "No music found"
   }
+  val edited = MusicTagEdits.apply(context, result)
   val excluded = MusicSettings.excluded()
-  if (excluded.isNotEmpty()) return result.filter { t -> excluded.none { t.path.startsWith(it) } }
-  return result
+  if (excluded.isNotEmpty()) return edited.filter { t -> excluded.none { t.path.startsWith(it) } }
+  return edited
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -207,6 +263,9 @@ object MusicController {
   var serviceRunning = false
 
   val queue = mutableStateListOf<MusicTrack>()
+
+  /** Goes up when a song's tags were edited, so the library lists reload. */
+  var libraryVersion by mutableIntStateOf(0)
   var index by mutableIntStateOf(-1)
   var isPlaying by mutableStateOf(false)
   var shuffle by mutableStateOf(false)
@@ -901,6 +960,18 @@ object MusicController {
     clearSavedQueue()
     session?.isActive = false
     app.stopService(Intent(app, MusicPlaybackService::class.java))
+    MusicWidgetUpdater.update(app)
+  }
+
+  /** Swaps an edited song into the queue and tells the screens and widgets. */
+  fun applyTagEdit(t: MusicTrack) {
+    for (i in queue.indices) if (queue[i].id == t.id) queue[i] = t
+    baseQueue = baseQueue.map { if (it.id == t.id) t else it }
+    libraryVersion++
+    try {
+      updateSession()
+    } catch (_: Exception) {
+    }
     MusicWidgetUpdater.update(app)
   }
 

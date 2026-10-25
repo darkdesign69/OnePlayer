@@ -13,7 +13,17 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -91,6 +101,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LibraryMusic
@@ -262,7 +273,7 @@ object MusicScreen : Screen {
     var reloadKey by remember { mutableIntStateOf(0) }
     var scanning by remember { mutableStateOf(false) }
 
-    LaunchedEffect(granted, reloadKey, MusicSettings.minDurationSec, MusicSettings.excludedFolders) {
+    LaunchedEffect(granted, reloadKey, MusicSettings.minDurationSec, MusicSettings.excludedFolders, MusicController.libraryVersion) {
       if (granted) {
         loading = true
         tracks = withContext(Dispatchers.IO) { loadMusicTracks(context) }
@@ -1002,6 +1013,7 @@ private fun SongRow(
   extra: (() -> Unit)? = null,
 ) {
   var menu by remember { mutableStateOf(false) }
+  var showTags by remember { mutableStateOf(false) }
   val isCurrent = MusicController.current?.id == track.id
   val rowHighlight = accentPalette.getOrNull(MusicSettings.highlightIdx - 1) ?: MaterialTheme.colorScheme.primary
   val rowShade = lerp(solidSurface(), rowHighlight.copy(alpha = 1f), MusicSettings.highlightAlpha / 100f)
@@ -1062,6 +1074,7 @@ private fun SongRow(
           if (extra != null) add(SheetItem("Remove from playlist", Icons.Filled.Delete) { extra() })
           add(SheetItem("Go to album", Icons.Filled.Album, divider = true) { actions.goAlbum(track) })
           add(SheetItem("Go to artist", Icons.Filled.Person) { actions.goArtist(track) })
+          add(SheetItem("Tag editor", Icons.Filled.Edit, divider = true) { showTags = true })
           add(SheetItem("Details", Icons.Filled.Info) { actions.info(track) })
           add(SheetItem("Share", Icons.Filled.Share) { actions.share(track) })
           val folder = track.path.substringBeforeLast('/', "")
@@ -1070,6 +1083,44 @@ private fun SongRow(
       onDismiss = { menu = false },
     )
   }
+  if (showTags) TagEditorDialog(track) { showTags = false }
+}
+
+/** Edit title, artist and album of a song. */
+@Composable
+internal fun TagEditorDialog(
+  track: MusicTrack,
+  onDismiss: () -> Unit,
+) {
+  val ctx = LocalContext.current
+  var title by remember(track.id) { mutableStateOf(track.title) }
+  var artist by remember(track.id) { mutableStateOf(track.artist) }
+  var album by remember(track.id) { mutableStateOf(track.album) }
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text("Tag editor") },
+    text = {
+      Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(value = artist, onValueChange = { artist = it }, label = { Text("Artist") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(value = album, onValueChange = { album = it }, label = { Text("Album") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+      }
+    },
+    confirmButton = {
+      TextButton(
+        onClick = {
+          val t = title.trim().ifBlank { track.title }
+          val a = artist.trim().ifBlank { track.artist }
+          val al = album.trim().ifBlank { track.album }
+          MusicTagEdits.save(ctx, track, t, a, al)
+          MusicController.applyTagEdit(track.copy(title = t, artist = a, album = al))
+          Toast.makeText(ctx, "Tags saved", Toast.LENGTH_SHORT).show()
+          onDismiss()
+        },
+      ) { Text("Save") }
+    },
+    dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+  )
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1162,6 +1213,11 @@ private fun NowPlaying(
     return "%02d:%02d".format(sec / 60, sec % 60)
   }
   var showEditor by remember { mutableStateOf(false) }
+  var showTags by remember { mutableStateOf(false) }
+  val swipeDir = remember { mutableIntStateOf(1) }
+  val dragX = remember { Animatable(0f) }
+  val swipeScope = rememberCoroutineScope()
+  LaunchedEffect(t.id) { swipeDir.intValue = 1 }
 
   LaunchedEffect(MusicController.index, MusicController.isPlaying) {
     while (true) {
@@ -1258,12 +1314,23 @@ private fun NowPlaying(
               var dx = 0f
               detectHorizontalDragGestures(
                 onDragStart = { dx = 0f },
+                onDragCancel = { swipeScope.launch { dragX.animateTo(0f, tween(200)) } },
                 onDragEnd = {
                   if (MusicSettings.swipeCover && !showLyrics) {
-                    if (dx > 150f) MusicController.previous() else if (dx < -150f) MusicController.next()
+                    if (dx > 150f) {
+                      swipeDir.intValue = -1
+                      MusicController.previous()
+                    } else if (dx < -150f) {
+                      swipeDir.intValue = 1
+                      MusicController.next()
+                    }
                   }
+                  swipeScope.launch { dragX.animateTo(0f, tween(200)) }
                 },
-              ) { _, delta -> dx += delta }
+              ) { _, delta ->
+                dx += delta
+                if (MusicSettings.swipeCover && !showLyrics) swipeScope.launch { dragX.snapTo(dragX.value + delta) }
+              }
             },
         contentAlignment = Alignment.Center,
       ) {
@@ -1279,7 +1346,22 @@ private fun NowPlaying(
             modifier = Modifier.fillMaxSize(),
           )
         } else {
-          TrackArt(t, 800, Modifier.fillMaxWidth(coverFraction).aspectRatio(1f), RoundedCornerShape(28.dp))
+          // the cover follows the finger, and a new song slides in from the side you swiped towards
+          AnimatedContent(
+            targetState = t,
+            transitionSpec = {
+              val d = swipeDir.intValue
+              (slideInHorizontally(tween(320)) { it * d } + fadeIn(tween(320))) togetherWith
+                (slideOutHorizontally(tween(320)) { -it * d } + fadeOut(tween(200)))
+            },
+            contentKey = { it.id },
+            label = "cover",
+            modifier =
+              Modifier.graphicsLayer {
+                translationX = dragX.value * 0.7f
+                alpha = 1f - (kotlin.math.abs(dragX.value) / 900f).coerceAtMost(0.4f)
+              },
+          ) { tr -> TrackArt(tr, 800, Modifier.fillMaxWidth(coverFraction).aspectRatio(1f), RoundedCornerShape(28.dp)) }
         }
       }
       Spacer(Modifier.height(20.dp))
@@ -1296,11 +1378,11 @@ private fun NowPlaying(
             tint = if (MusicController.repeat != 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
           )
         }
-        IconButton(onClick = { MusicController.previous() }, modifier = Modifier.size(56.dp)) { Icon(Icons.Filled.SkipPrevious, "Previous", Modifier.size(36.dp)) }
+        IconButton(onClick = { swipeDir.intValue = -1; MusicController.previous() }, modifier = Modifier.size(56.dp)) { Icon(Icons.Filled.SkipPrevious, "Previous", Modifier.size(36.dp)) }
         FilledIconButton(onClick = { MusicController.togglePlay() }, modifier = Modifier.size(88.dp)) {
           Icon(if (MusicController.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, "Play/Pause", Modifier.size(44.dp))
         }
-        IconButton(onClick = { MusicController.next() }, modifier = Modifier.size(56.dp)) { Icon(Icons.Filled.SkipNext, "Next", Modifier.size(36.dp)) }
+        IconButton(onClick = { swipeDir.intValue = 1; MusicController.next() }, modifier = Modifier.size(56.dp)) { Icon(Icons.Filled.SkipNext, "Next", Modifier.size(36.dp)) }
         IconButton(onClick = { MusicController.toggleShuffle() }) {
           Icon(Icons.Filled.Shuffle, "Shuffle", tint = if (MusicController.shuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
         }
@@ -1374,6 +1456,7 @@ private fun NowPlaying(
             item("Sleep timer") { showSleep = true }
             item("Playback speed") { showSpeed = true }
             item("Equalizer") { openEqualizer(context) }
+            item("Tag editor") { showTags = true }
             item("Edit lyrics") { showEditor = true }
             item("Add to playlist") { actions.addToPlaylist(t) }
             item("Go to album") { actions.goAlbum(t) }
@@ -1390,6 +1473,8 @@ private fun NowPlaying(
     }
   }
   }
+
+  if (showTags) TagEditorDialog(t) { showTags = false }
 
   if (showEditor) {
     Dialog(onDismissRequest = { showEditor = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {

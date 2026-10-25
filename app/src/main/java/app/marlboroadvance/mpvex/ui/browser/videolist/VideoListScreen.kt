@@ -861,7 +861,7 @@ private fun VideoListContent(
                 isGridMode = mediaLayoutMode == MediaLayoutMode.GRID,
                 gridColumns = videoGridColumns,
                 showSubtitleIndicator = showSubtitleIndicator,
-                allowThumbnailGeneration = false,
+                allowThumbnailGeneration = true,
               )
             }
             }
@@ -912,7 +912,7 @@ private fun VideoListContent(
                   },
                   isGridMode = false,
                   showSubtitleIndicator = showSubtitleIndicator,
-                  allowThumbnailGeneration = false,
+                  allowThumbnailGeneration = true,
                 )
               }
             }
