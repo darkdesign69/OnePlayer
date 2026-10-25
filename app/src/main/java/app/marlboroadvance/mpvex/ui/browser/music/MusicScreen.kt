@@ -101,6 +101,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LibraryMusic
@@ -1073,7 +1074,7 @@ private fun SongRow(
           if (extra != null) add(SheetItem("Remove from playlist", Icons.Filled.Delete) { extra() })
           add(SheetItem("Go to album", Icons.Filled.Album, divider = true) { actions.goAlbum(track) })
           add(SheetItem("Go to artist", Icons.Filled.Person) { actions.goArtist(track) })
-          add(SheetItem("Tag editor", androidx.compose.material.icons.Icons.Filled.Edit, divider = true) { showTags = true })
+          add(SheetItem("Tag editor", Icons.Filled.Edit, divider = true) { showTags = true })
           add(SheetItem("Details", Icons.Filled.Info) { actions.info(track) })
           add(SheetItem("Share", Icons.Filled.Share) { actions.share(track) })
           val folder = track.path.substringBeforeLast('/', "")
