@@ -92,6 +92,7 @@ object CustomizeThemeScreen : Screen {
     val version by preferences.customBackgroundVersion.collectAsState()
     val transparency by preferences.customBackgroundTransparency.collectAsState()
     val blur by preferences.customBackgroundBlur.collectAsState()
+    val dim by preferences.customBackgroundDim.collectAsState()
     val accent by preferences.customAccent.collectAsState()
 
     val pickPhoto =
@@ -171,6 +172,7 @@ object CustomizeThemeScreen : Screen {
                 mode = mode,
                 version = version,
                 blur = blur,
+                dim = dim,
                 modifier = Modifier.fillMaxSize(),
               )
             }
@@ -313,6 +315,13 @@ object CustomizeThemeScreen : Screen {
                 label = "Blur",
                 value = blur,
                 onValueChange = { preferences.customBackgroundBlur.set(it) },
+              )
+            }
+            if (backgroundShown) {
+              LabeledSlider(
+                label = "Dark overlay",
+                value = dim,
+                onValueChange = { preferences.customBackgroundDim.set(it) },
               )
             }
 

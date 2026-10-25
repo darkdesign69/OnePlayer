@@ -35,6 +35,7 @@ class AppearancePreferences(
   val customBackgroundVersion = preferenceStore.getInt("custom_background_version", 0)
   val customBackgroundTransparency = preferenceStore.getFloat("custom_background_transparency", 0.5f)
   val customBackgroundBlur = preferenceStore.getFloat("custom_background_blur", 0f)
+  val customBackgroundDim = preferenceStore.getFloat("custom_background_dim", 0f)
   val customAccent = preferenceStore.getInt("custom_accent", 0)
 
   val topLeftControls =
