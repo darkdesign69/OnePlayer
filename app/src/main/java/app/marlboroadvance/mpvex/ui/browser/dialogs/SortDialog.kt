@@ -17,6 +17,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
@@ -73,12 +78,18 @@ fun SortDialog(
 
   val (ascLabel, descLabel) = getLabelForType(sortType, sortOrderAsc)
 
+  // Smaller window: everything inside is drawn at 85% size and the list scrolls when it would fill the screen
+  val scale = 0.85f
+  val outerDensity = LocalDensity.current
+  val maxContentHeight = (LocalConfiguration.current.screenHeightDp * 0.62f / scale).dp
+
+  CompositionLocalProvider(LocalDensity provides Density(outerDensity.density * scale, outerDensity.fontScale)) {
   AlertDialog(
     onDismissRequest = onDismiss,
     title = {
       Text(
         text = title,
-        style = MaterialTheme.typography.headlineSmall,
+        style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.Medium,
         color = MaterialTheme.colorScheme.onSurface,
       )
@@ -88,8 +99,9 @@ fun SortDialog(
         modifier =
           Modifier
             .fillMaxWidth()
+            .heightIn(max = maxContentHeight)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
       ) {
         if (showSortOptions) {
           SortTypeSelector(
@@ -159,6 +171,7 @@ fun SortDialog(
     shape = MaterialTheme.shapes.extraLarge,
     modifier = modifier,
   )
+  }
 }
 
 data class VisibilityToggle(
