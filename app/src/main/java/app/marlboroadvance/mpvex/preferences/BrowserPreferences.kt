@@ -43,6 +43,7 @@ class BrowserPreferences(
   val showFramerateInResolution = preferenceStore.getBoolean("show_framerate_in_resolution", false)
   val showSubtitleIndicator = preferenceStore.getBoolean("show_subtitle_indicator", false)
   val showProgressBar = preferenceStore.getBoolean("show_progress_bar", true)
+  val showDurationOverlay = preferenceStore.getBoolean("show_duration_overlay", true)
   val mediaLayoutMode = preferenceStore.getEnum("media_layout_mode", MediaLayoutMode. LIST)
 
   // Visibility preferences for folder card chips
@@ -100,6 +101,10 @@ enum class VideoSortType {
   Duration,
   Date,
   Size,
+  Resolution,
+  FrameRate,
+  Path,
+  Type,
   ;
 
   val displayName: String
@@ -109,6 +114,10 @@ enum class VideoSortType {
         Duration -> "Duration"
         Date -> "Date"
         Size -> "Size"
+        Resolution -> "Resolution"
+        FrameRate -> "Frame rate"
+        Path -> "Path"
+        Type -> "Type"
       }
 }
 

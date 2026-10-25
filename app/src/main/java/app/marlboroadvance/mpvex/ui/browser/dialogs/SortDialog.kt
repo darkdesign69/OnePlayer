@@ -1,46 +1,38 @@
 package app.marlboroadvance.mpvex.ui.browser.dialogs
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Density
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,9 +41,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 
+/**
+ * "Sort & View Options" window. Laid out compactly, like MX Player: view mode and layout side by side,
+ * a grid of sort choices, the order, grid columns, then collapsible Fields and Advanced sections.
+ */
 @Composable
 fun SortDialog(
   isOpen: Boolean,
@@ -67,110 +68,165 @@ fun SortDialog(
   modifier: Modifier = Modifier,
   visibilityToggles: List<VisibilityToggle> = emptyList(),
   viewModeSelector: ViewModeSelector? = null,
-  layoutModeSelector:  ViewModeSelector? = null,
+  layoutModeSelector: ViewModeSelector? = null,
   folderGridColumnSelector: GridColumnSelector? = null,
   videoGridColumnSelector: GridColumnSelector? = null,
   showSortOptions: Boolean = true,
   enableViewModeOptions: Boolean = true,
   enableLayoutModeOptions: Boolean = true,
+  advancedToggles: List<VisibilityToggle> = emptyList(),
 ) {
   if (!isOpen) return
 
   val (ascLabel, descLabel) = getLabelForType(sortType, sortOrderAsc)
 
-  // Smaller window: everything inside is drawn at 85% size and the list scrolls when it would fill the screen
-  val scale = 0.85f
+  // Slightly smaller than normal, and the list scrolls inside when it would fill the screen
+  val scale = 0.92f
   val outerDensity = LocalDensity.current
-  val maxContentHeight = (LocalConfiguration.current.screenHeightDp * 0.62f / scale).dp
+  val maxContentHeight = (LocalConfiguration.current.screenHeightDp * 0.66f / scale).dp
 
   CompositionLocalProvider(LocalDensity provides Density(outerDensity.density * scale, outerDensity.fontScale)) {
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    title = {
-      Text(
-        text = title,
-        style = MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.Medium,
-        color = MaterialTheme.colorScheme.onSurface,
-      )
-    },
-    text = {
-      Column(
-        modifier =
-          Modifier
-            .fillMaxWidth()
-            .heightIn(max = maxContentHeight)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-      ) {
-        if (showSortOptions) {
-          SortTypeSelector(
-            sortType = sortType,
-            onSortTypeChange = onSortTypeChange,
-            types = types,
-            icons = icons,
-            modifier = Modifier.fillMaxWidth(),
-          )
+    AlertDialog(
+      onDismissRequest = onDismiss,
+      title = null,
+      text = {
+        Column(
+          modifier =
+            Modifier
+              .fillMaxWidth()
+              .heightIn(max = maxContentHeight)
+              .verticalScroll(rememberScrollState()),
+          verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+          if (viewModeSelector != null || layoutModeSelector != null) {
+            val leftCount = if (viewModeSelector?.thirdOptionLabel != null) 3 else 2
+            Row(
+              modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+              verticalAlignment = Alignment.Top,
+            ) {
+              if (viewModeSelector != null) {
+                ModeSelector(
+                  selector = viewModeSelector,
+                  enabled = enableViewModeOptions,
+                  modifier = Modifier.weight(if (layoutModeSelector != null) leftCount.toFloat() else 1f),
+                )
+              }
+              if (viewModeSelector != null && layoutModeSelector != null) {
+                VerticalDivider(
+                  modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                  color = MaterialTheme.colorScheme.outlineVariant,
+                )
+              }
+              if (layoutModeSelector != null) {
+                ModeSelector(
+                  selector = layoutModeSelector,
+                  enabled = enableLayoutModeOptions,
+                  modifier = Modifier.weight(if (viewModeSelector != null) 2f else 1f),
+                )
+              }
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+          }
 
-          SortOrderSelector(
-            sortOrderAsc = sortOrderAsc,
-            onSortOrderChange = onSortOrderChange,
-            ascLabel = ascLabel,
-            descLabel = descLabel,
-            modifier = Modifier.fillMaxWidth(),
-          )
-        }
-
-        if (viewModeSelector != null || layoutModeSelector != null) {
-          Row(
-            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.Top,
-          ) {
-            if (viewModeSelector != null) {
-              ViewModeSelectorComponent(
-                viewModeSelector = viewModeSelector,
-                enabled = enableViewModeOptions,
-                modifier = Modifier.weight(1f),
+          if (showSortOptions) {
+            SectionTitle("Sort")
+            GridOf(
+              columns = 5,
+              count = types.size,
+            ) { index, cellModifier ->
+              OptionCell(
+                icon = icons.getOrNull(index),
+                label = types[index],
+                selected = sortType == types[index],
+                enabled = true,
+                modifier = cellModifier,
+                onClick = { onSortTypeChange(types[index]) },
               )
             }
+            Spacer(Modifier.height(4.dp))
+            SortOrderSelector(
+              sortOrderAsc = sortOrderAsc,
+              onSortOrderChange = onSortOrderChange,
+              ascLabel = ascLabel,
+              descLabel = descLabel,
+              modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            )
+            Spacer(Modifier.height(4.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+          }
 
-            if (viewModeSelector != null && layoutModeSelector != null) {
-              VerticalDivider(
-                modifier = Modifier.padding(vertical = 8.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
-              )
+          GridColumnsSection(
+            folderGridColumnSelector = folderGridColumnSelector,
+            videoGridColumnSelector = videoGridColumnSelector,
+          )
+
+          if (visibilityToggles.isNotEmpty()) {
+            CollapsibleSection(title = "Fields", startExpanded = true) {
+              GridOf(columns = 3, count = visibilityToggles.size) { index, cellModifier ->
+                val toggle = visibilityToggles[index]
+                Row(
+                  modifier =
+                    cellModifier
+                      .clip(RoundedCornerShape(8.dp))
+                      .clickable { toggle.onCheckedChange(!toggle.checked) }
+                      .padding(vertical = 6.dp, horizontal = 4.dp),
+                  verticalAlignment = Alignment.CenterVertically,
+                  horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                  Checkbox(
+                    checked = toggle.checked,
+                    onCheckedChange = null,
+                    modifier = Modifier.size(20.dp),
+                  )
+                  Text(
+                    text = toggle.label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                  )
+                }
+              }
             }
+          }
 
-            if (layoutModeSelector != null) {
-              ViewModeSelectorComponent(
-                viewModeSelector = layoutModeSelector,
-                enabled = enableLayoutModeOptions,
-                modifier = Modifier.weight(1f),
-              )
+          if (advancedToggles.isNotEmpty()) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            CollapsibleSection(title = "Advanced", startExpanded = true) {
+              Column(modifier = Modifier.fillMaxWidth()) {
+                advancedToggles.forEach { toggle ->
+                  Row(
+                    modifier =
+                      Modifier
+                        .fillMaxWidth()
+                        .clickable { toggle.onCheckedChange(!toggle.checked) }
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                  ) {
+                    Text(
+                      text = toggle.label,
+                      style = MaterialTheme.typography.bodyLarge,
+                      color = MaterialTheme.colorScheme.onSurface,
+                      modifier = Modifier.weight(1f),
+                    )
+                    Switch(checked = toggle.checked, onCheckedChange = null)
+                  }
+                }
+              }
             }
           }
         }
-
-        GridColumnsSection(
-          folderGridColumnSelector = folderGridColumnSelector,
-          videoGridColumnSelector = videoGridColumnSelector,
-        )
-
-        if (visibilityToggles.isNotEmpty()) {
-          VisibilityTogglesSection(
-            toggles = visibilityToggles,
-            modifier = Modifier.fillMaxWidth(),
-          )
+      },
+      confirmButton = {
+        TextButton(onClick = onDismiss) {
+          Text("Done", fontWeight = FontWeight.Bold)
         }
-      }
-    },
-    confirmButton = {},
-    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-    tonalElevation = 6.dp,
-    shape = MaterialTheme.shapes.extraLarge,
-    modifier = modifier,
-  )
+      },
+      containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+      tonalElevation = 6.dp,
+      shape = RoundedCornerShape(16.dp),
+      modifier = modifier.widthIn(min = 280.dp),
+    )
   }
 }
 
@@ -204,87 +260,127 @@ data class GridColumnSelector(
 )
 
 // -----------------------------------------------------------------------------
-// Consolidated internal composable for sort UI (Material You styling)
+// Pieces of the window
 // -----------------------------------------------------------------------------
 
 @Composable
-private fun SortTypeSelector(
-  sortType: String,
-  onSortTypeChange: (String) -> Unit,
-  types: List<String>,
-  icons: List<ImageVector>,
-  modifier: Modifier = Modifier,
+private fun SectionTitle(text: String) {
+  Text(
+    text = text,
+    style = MaterialTheme.typography.titleSmall,
+    fontWeight = FontWeight.SemiBold,
+    color = MaterialTheme.colorScheme.onSurface,
+    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+  )
+}
+
+/** Lays [count] items out in rows of [columns] equal cells. */
+@Composable
+private fun GridOf(
+  columns: Int,
+  count: Int,
+  cell: @Composable (index: Int, modifier: Modifier) -> Unit,
 ) {
-  Column(
-    modifier = modifier,
-    verticalArrangement = Arrangement.spacedBy(12.dp),
-  ) {
-    Text(
-      text = "Sort by",
-      style = MaterialTheme.typography.titleMedium,
-      fontWeight = FontWeight.Medium,
-      color = MaterialTheme.colorScheme.onSurface,
-    )
-
-    Row(
-      modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.SpaceEvenly,
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      types.forEachIndexed { index, type ->
-        val selected = sortType == type
-        val shape = RoundedCornerShape(16.dp)
-
-        Column(
-          horizontalAlignment = Alignment.CenterHorizontally,
-          verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-          Box(
-            modifier =
-              Modifier
-                .size(56.dp)
-                .clip(shape)
-                .background(
-                  color =
-                    if (selected) {
-                      MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                      MaterialTheme.colorScheme.surfaceContainerHighest
-                    },
-                )
-                .clickable(
-                  onClick = { onSortTypeChange(type) },
-                  interactionSource = remember { MutableInteractionSource() },
-                  indication = ripple(bounded = true),
-                ),
-            contentAlignment = Alignment.Center,
-          ) {
-            Icon(
-              imageVector = icons[index],
-              contentDescription = type,
-              tint =
-                if (selected) {
-                  MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                  MaterialTheme.colorScheme.onSurfaceVariant
-                },
-              modifier = Modifier.size(24.dp),
-            )
+  Column(modifier = Modifier.fillMaxWidth()) {
+    var start = 0
+    while (start < count) {
+      Row(modifier = Modifier.fillMaxWidth()) {
+        for (i in 0 until columns) {
+          val index = start + i
+          if (index < count) {
+            cell(index, Modifier.weight(1f))
+          } else {
+            Spacer(Modifier.weight(1f))
           }
-
-          Text(
-            text = type,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
-            color =
-              if (selected) {
-                MaterialTheme.colorScheme.onSurface
-              } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-              },
-          )
         }
       }
+      start += columns
+    }
+  }
+}
+
+/** A small icon with its name underneath; the chosen one is drawn in the accent colour. */
+@Composable
+private fun OptionCell(
+  icon: ImageVector?,
+  label: String,
+  selected: Boolean,
+  enabled: Boolean,
+  modifier: Modifier = Modifier,
+  onClick: () -> Unit,
+) {
+  val color =
+    when {
+      !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+      selected -> MaterialTheme.colorScheme.primary
+      else -> MaterialTheme.colorScheme.onSurface
+    }
+  Column(
+    modifier =
+      modifier
+        .clip(RoundedCornerShape(12.dp))
+        .clickable(enabled = enabled, onClick = onClick)
+        .padding(vertical = 8.dp, horizontal = 2.dp),
+    horizontalAlignment = Alignment.CenterHorizontally,
+    verticalArrangement = Arrangement.spacedBy(4.dp),
+  ) {
+    if (icon != null) {
+      Icon(imageVector = icon, contentDescription = label, tint = color, modifier = Modifier.size(26.dp))
+    }
+    Text(
+      text = label,
+      style = MaterialTheme.typography.labelMedium,
+      fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+      color = color,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+      textAlign = TextAlign.Center,
+    )
+  }
+}
+
+@Composable
+private fun ModeSelector(
+  selector: ViewModeSelector,
+  enabled: Boolean,
+  modifier: Modifier = Modifier,
+) {
+  val hasThird = selector.thirdOptionLabel != null && selector.thirdOptionIcon != null
+  val selectedIndex =
+    when {
+      hasThird && selector.isThirdOptionSelected -> 2
+      selector.isFirstOptionSelected -> 0
+      else -> 1
+    }
+  val labels =
+    if (hasThird) {
+      listOf(selector.firstOptionLabel, selector.secondOptionLabel, selector.thirdOptionLabel!!)
+    } else {
+      listOf(selector.firstOptionLabel, selector.secondOptionLabel)
+    }
+  val iconList =
+    if (hasThird) {
+      listOf(selector.firstOptionIcon, selector.secondOptionIcon, selector.thirdOptionIcon!!)
+    } else {
+      listOf(selector.firstOptionIcon, selector.secondOptionIcon)
+    }
+  Column(modifier = modifier) {
+    SectionTitle(selector.label)
+    GridOf(columns = labels.size, count = labels.size) { index, cellModifier ->
+      OptionCell(
+        icon = iconList[index],
+        label = labels[index],
+        selected = index == selectedIndex,
+        enabled = enabled,
+        modifier = cellModifier,
+        onClick = {
+          when (index) {
+            0 -> selector.onViewModeChange(true)
+            1 -> selector.onViewModeChange(false)
+            else -> selector.onThirdOptionClick?.invoke()
+          }
+        },
+      )
     }
   }
 }
@@ -300,16 +396,10 @@ private fun SortOrderSelector(
   val options = listOf(ascLabel, descLabel)
   val selectedIndex = if (sortOrderAsc) 0 else 1
 
-  SingleChoiceSegmentedButtonRow(
-    modifier = modifier.fillMaxWidth(),
-  ) {
+  SingleChoiceSegmentedButtonRow(modifier = modifier.fillMaxWidth()) {
     options.forEachIndexed { index, label ->
       SegmentedButton(
-        shape =
-          SegmentedButtonDefaults.itemShape(
-            index = index,
-            count = options.size,
-          ),
+        shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
         onClick = { onSortOrderChange(index == 0) },
         selected = index == selectedIndex,
         icon = {
@@ -320,213 +410,66 @@ private fun SortOrderSelector(
           )
         },
       ) {
-        Text(label)
+        Text(label, maxLines = 1)
       }
     }
   }
 }
 
+/** A heading with an arrow that opens and closes what is under it. */
 @Composable
-private fun ViewModeSelectorComponent(
-  viewModeSelector: ViewModeSelector,
-  enabled: Boolean = true,
-  modifier: Modifier = Modifier,
+private fun CollapsibleSection(
+  title: String,
+  startExpanded: Boolean,
+  content: @Composable () -> Unit,
 ) {
-  val hasThird = viewModeSelector.thirdOptionLabel != null && viewModeSelector.thirdOptionIcon != null
-  val options =
-    if (hasThird) {
-      listOf(viewModeSelector.firstOptionLabel, viewModeSelector.secondOptionLabel, viewModeSelector.thirdOptionLabel!!)
-    } else {
-      listOf(viewModeSelector.firstOptionLabel, viewModeSelector.secondOptionLabel)
-    }
-  val icons =
-    if (hasThird) {
-      listOf(viewModeSelector.firstOptionIcon, viewModeSelector.secondOptionIcon, viewModeSelector.thirdOptionIcon!!)
-    } else {
-      listOf(viewModeSelector.firstOptionIcon, viewModeSelector.secondOptionIcon)
-    }
-  val selectedIndex =
-    when {
-      hasThird && viewModeSelector.isThirdOptionSelected -> 2
-      viewModeSelector.isFirstOptionSelected -> 0
-      else -> 1
-    }
-
-  Column(
-    modifier = modifier,
-    verticalArrangement = Arrangement.spacedBy(8.dp),
+  var expanded by remember { mutableStateOf(startExpanded) }
+  Row(
+    modifier =
+      Modifier
+        .fillMaxWidth()
+        .clickable { expanded = !expanded }
+        .padding(horizontal = 8.dp, vertical = 10.dp),
+    verticalAlignment = Alignment.CenterVertically,
   ) {
     Text(
-      text = viewModeSelector.label,
-      style = MaterialTheme.typography.titleMedium,
-      fontWeight = FontWeight.Medium,
-      color = if (enabled) {
-        MaterialTheme.colorScheme.onSurface
-      } else {
-        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-      },
-    )
-
-    Row(
-      modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.SpaceEvenly,
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      options.forEachIndexed { index, label ->
-        val selected = index == selectedIndex
-        val shape = RoundedCornerShape(12.dp)
-
-        Column(
-          horizontalAlignment = Alignment.CenterHorizontally,
-          verticalArrangement = Arrangement.spacedBy(6.dp),
-          modifier = Modifier
-            .clip(shape)
-            .clickable(enabled = enabled) { 
-              if (enabled) {
-                when (index) {
-                  0 -> viewModeSelector.onViewModeChange(true)
-                  1 -> viewModeSelector.onViewModeChange(false)
-                  else -> viewModeSelector.onThirdOptionClick?.invoke()
-                }
-              }
-            }
-            .padding(8.dp),
-        ) {
-          Box(
-            modifier = Modifier
-              .size(44.dp)
-              .clip(shape)
-              .background(
-                color = if (selected && enabled) {
-                  MaterialTheme.colorScheme.primaryContainer
-                } else if (enabled) {
-                  MaterialTheme.colorScheme.surfaceContainerHighest
-                } else {
-                  MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.38f)
-                },
-              ),
-            contentAlignment = Alignment.Center,
-          ) {
-            Icon(
-              imageVector = icons[index],
-              contentDescription = label,
-              tint = if (selected && enabled) {
-                MaterialTheme.colorScheme.onPrimaryContainer
-              } else if (enabled) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-              } else {
-                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-              },
-              modifier = Modifier.size(20.dp),
-            )
-          }
-
-          Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = if (selected && enabled) FontWeight.Medium else FontWeight.Normal,
-            color = if (selected && enabled) {
-              MaterialTheme.colorScheme.primary
-            } else if (enabled) {
-              MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-              MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-            },
-          )
-        }
-      }
-    }
-  }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun VisibilityTogglesSection(
-  toggles: List<VisibilityToggle>,
-  modifier: Modifier = Modifier,
-) {
-  var expanded by remember { mutableStateOf(false) }
-
-  Column(
-    modifier = modifier,
-    verticalArrangement = Arrangement.spacedBy(12.dp),
-  ) {
-    // Header row with Fields text and dropdown button
-    Row(
-      modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.SpaceBetween,
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      Text(
-        text = "Fields",
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Medium,
-        color = MaterialTheme.colorScheme.onSurface,
-      )
-
-      IconButton(
-        onClick = { expanded = !expanded },
-      ) {
-        Icon(
-          imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.ArrowDropDown,
-          contentDescription = if (expanded) "Collapse" else "Expand",
-          tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-      }
-    }
-
-    // Expandable filter chips section
-    if (expanded) {
-      FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-      ) {
-        toggles.forEach { toggle ->
-          FilterChip(
-            selected = toggle.checked,
-            onClick = { toggle.onCheckedChange(!toggle.checked) },
-            label = {
-              Text(
-                text = toggle.label,
-                style = MaterialTheme.typography.labelLarge,
-              )
-            },
-            leadingIcon = null,
-          )
-        }
-      }
-    }
-  }
-}
-
-@Composable
-private fun GridColumnSelectorComponent(
-  gridColumnSelector: GridColumnSelector,
-  modifier: Modifier = Modifier,
-) {
-  Column(
-    modifier = modifier,
-    verticalArrangement = Arrangement.spacedBy(12.dp),
-  ) {
-    Text(
-      text = gridColumnSelector.label,
-      style = MaterialTheme.typography.titleMedium,
-      fontWeight = FontWeight.Medium,
+      text = title,
+      style = MaterialTheme.typography.titleSmall,
+      fontWeight = FontWeight.SemiBold,
       color = MaterialTheme.colorScheme.onSurface,
+      modifier = Modifier.weight(1f),
     )
+    Icon(
+      imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+      contentDescription = if (expanded) "Collapse" else "Expand",
+      tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+  }
+  if (expanded) content()
+}
 
+@Composable
+private fun ColumnSlider(
+  title: String,
+  selector: GridColumnSelector,
+  modifier: Modifier = Modifier,
+) {
+  Column(modifier = modifier) {
+    Text(
+      text = title,
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
     Slider(
-      value = gridColumnSelector.currentValue.toFloat(),
-      onValueChange = { gridColumnSelector.onValueChange(it.toInt()) },
-      valueRange = gridColumnSelector.valueRange,
-      steps = gridColumnSelector.steps,
+      value = selector.currentValue.toFloat(),
+      onValueChange = { selector.onValueChange(it.toInt()) },
+      valueRange = selector.valueRange,
+      steps = selector.steps,
       modifier = Modifier.fillMaxWidth(),
     )
-
     Text(
-      text = "${gridColumnSelector.currentValue} columns",
-      style = MaterialTheme.typography.bodyMedium,
+      text = "${selector.currentValue} columns",
+      style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
       modifier = Modifier.align(Alignment.CenterHorizontally),
     )
@@ -537,77 +480,20 @@ private fun GridColumnSelectorComponent(
 private fun GridColumnsSection(
   folderGridColumnSelector: GridColumnSelector?,
   videoGridColumnSelector: GridColumnSelector?,
-  modifier: Modifier = Modifier,
 ) {
   if (folderGridColumnSelector == null && videoGridColumnSelector == null) return
 
-  Column(
-    modifier = modifier,
-    verticalArrangement = Arrangement.spacedBy(12.dp),
+  SectionTitle("Grid columns")
+  Row(
+    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+    horizontalArrangement = Arrangement.spacedBy(16.dp),
   ) {
-    Text(
-      text = "Grid Columns",
-      style = MaterialTheme.typography.titleMedium,
-      fontWeight = FontWeight.Medium,
-      color = MaterialTheme.colorScheme.onSurface,
-    )
-
-    Row(
-      modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.spacedBy(16.dp),
-      verticalAlignment = Alignment.Top,
-    ) {
-      if (folderGridColumnSelector != null) {
-        Column(
-          modifier = Modifier.weight(1f),
-          verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-          Text(
-            text = "Folder Grid",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-          Slider(
-            value = folderGridColumnSelector.currentValue.toFloat(),
-            onValueChange = { folderGridColumnSelector.onValueChange(it.toInt()) },
-            valueRange = folderGridColumnSelector.valueRange,
-            steps = folderGridColumnSelector.steps,
-            modifier = Modifier.fillMaxWidth(),
-          )
-          Text(
-            text = "${folderGridColumnSelector.currentValue} columns",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-          )
-        }
-      }
-
-      if (videoGridColumnSelector != null) {
-        Column(
-          modifier = Modifier.weight(1f),
-          verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-          Text(
-            text = "Video Grid",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-          Slider(
-            value = videoGridColumnSelector.currentValue.toFloat(),
-            onValueChange = { videoGridColumnSelector.onValueChange(it.toInt()) },
-            valueRange = videoGridColumnSelector.valueRange,
-            steps = videoGridColumnSelector.steps,
-            modifier = Modifier.fillMaxWidth(),
-          )
-          Text(
-            text = "${videoGridColumnSelector.currentValue} columns",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-          )
-        }
-      }
+    if (folderGridColumnSelector != null) {
+      ColumnSlider("Folder grid", folderGridColumnSelector, Modifier.weight(1f))
+    }
+    if (videoGridColumnSelector != null) {
+      ColumnSlider("Video grid", videoGridColumnSelector, Modifier.weight(1f))
     }
   }
+  HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(top = 4.dp))
 }
