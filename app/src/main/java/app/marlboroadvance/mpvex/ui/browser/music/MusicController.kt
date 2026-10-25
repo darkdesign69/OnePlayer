@@ -62,7 +62,10 @@ data class MusicTrack(
   val uri: Uri,
 )
 
-/** Title / artist / album the user changed in the Tag editor. Kept in the app, and applied whenever the library loads. */
+/**
+ * Everything the user changed in the Tag editor (title, artist, album, composer, year, cover ...).
+ * Kept in the app and applied whenever the library loads.
+ */
 object MusicTagEdits {
   private const val PREFS = "music_tag_edits"
 
@@ -72,6 +75,12 @@ object MusicTagEdits {
     } catch (_: Exception) {
       JSONObject()
     }
+
+  /** The saved edits of one song (empty when there are none). */
+  fun get(
+    ctx: Context,
+    id: Long,
+  ): JSONObject = read(ctx).optJSONObject(id.toString()) ?: JSONObject()
 
   fun apply(
     ctx: Context,
@@ -93,27 +102,104 @@ object MusicTagEdits {
   fun save(
     ctx: Context,
     track: MusicTrack,
-    title: String,
-    artist: String,
-    album: String,
+    fields: Map<String, String>,
   ) {
     val all = read(ctx)
-    all.put(
-      track.id.toString(),
-      JSONObject().put("title", title).put("artist", artist).put("album", album),
-    )
+    val e = all.optJSONObject(track.id.toString()) ?: JSONObject()
+    for ((k, v) in fields) e.put(k, v)
+    all.put(track.id.toString(), e)
     ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("edits", all.toString()).apply()
     try {
       val v =
         android.content.ContentValues().apply {
-          put(MediaStore.Audio.Media.TITLE, title)
-          put(MediaStore.Audio.Media.ARTIST, artist)
-          put(MediaStore.Audio.Media.ALBUM, album)
+          put(MediaStore.Audio.Media.TITLE, fields["title"] ?: track.title)
+          put(MediaStore.Audio.Media.ARTIST, fields["artist"] ?: track.artist)
+          put(MediaStore.Audio.Media.ALBUM, fields["album"] ?: track.album)
         }
       ctx.contentResolver.update(track.uri, v, null, null)
     } catch (_: Exception) {
       // not allowed on this Android version: the app's own copy above is used instead
     }
+  }
+
+  // ---- cover ----
+
+  private fun coverFile(
+    ctx: Context,
+    id: Long,
+  ) = java.io.File(java.io.File(ctx.filesDir, "tag_covers").apply { mkdirs() }, "$id.jpg")
+
+  /** 0 = the song's own cover, 1 = a cover picked in the Tag editor, 2 = cover removed */
+  fun coverState(
+    ctx: Context,
+    id: Long,
+  ): Int {
+    val e = read(ctx).optJSONObject(id.toString()) ?: return 0
+    return when {
+      e.optBoolean("coverRemoved", false) -> 2
+      e.optBoolean("coverCustom", false) && coverFile(ctx, id).exists() -> 1
+      else -> 0
+    }
+  }
+
+  fun loadCover(
+    ctx: Context,
+    id: Long,
+    size: Int,
+  ): Bitmap? =
+    try {
+      val f = coverFile(ctx, id)
+      val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+      BitmapFactory.decodeFile(f.absolutePath, o)
+      var sample = 1
+      while (o.outWidth / (sample * 2) >= size) sample *= 2
+      BitmapFactory.decodeFile(f.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample })
+    } catch (_: Exception) {
+      null
+    }
+
+  /** Copies a picked picture in as the song's cover (shrunk to at most 1024 px). */
+  fun setCover(
+    ctx: Context,
+    id: Long,
+    uri: Uri,
+  ): Boolean =
+    try {
+      val src =
+        ctx.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } ?: return false
+      val big = maxOf(src.width, src.height)
+      val bmp = if (big > 1024) Bitmap.createScaledBitmap(src, src.width * 1024 / big, src.height * 1024 / big, true) else src
+      coverFile(ctx, id).outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 92, it) }
+      mark(ctx, id, custom = true, removed = false)
+      true
+    } catch (_: Exception) {
+      false
+    }
+
+  fun removeCover(
+    ctx: Context,
+    id: Long,
+  ) {
+    try {
+      coverFile(ctx, id).delete()
+    } catch (_: Exception) {
+    }
+    mark(ctx, id, custom = false, removed = true)
+  }
+
+  private fun mark(
+    ctx: Context,
+    id: Long,
+    custom: Boolean,
+    removed: Boolean,
+  ) {
+    val all = read(ctx)
+    val e = all.optJSONObject(id.toString()) ?: JSONObject()
+    e.put("coverCustom", custom)
+    e.put("coverRemoved", removed)
+    all.put(id.toString(), e)
+    ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("edits", all.toString()).apply()
+    artCache.evictAll()
   }
 }
 
@@ -134,6 +220,16 @@ fun loadArt(
   track: MusicTrack,
   size: Int,
 ): Bitmap? {
+  when (MusicTagEdits.coverState(context, track.id)) {
+    2 -> return null
+    1 -> {
+      val ck = "c${track.id}_$size"
+      artCache.get(ck)?.let { return it }
+      val c = MusicTagEdits.loadCover(context, track.id, size)
+      if (c != null) artCache.put(ck, c)
+      return c
+    }
+  }
   val useStore = MusicSettings.useMediaStoreArt
   val key = (if (track.albumId > 0 && useStore) "a${track.albumId}" else "t${track.id}") + "_$size" + (if (useStore) "" else "_f")
   artCache.get(key)?.let { return it }
