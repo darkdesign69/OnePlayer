@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withPermit
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -33,7 +35,10 @@ class ThumbnailRepository(
       app.marlboroadvance.mpvex.preferences.AppearancePreferences::class.java
     ) 
   }
-  private val diskCacheDimension = 1024
+  private val diskCacheDimension = 512
+  private val legacyDiskDimension = 1024
+  // at most this many thumbnails are generated at the same time (each one starts a decoder)
+  private val generationLimit = kotlinx.coroutines.sync.Semaphore(3)
   private val diskJpegQuality = 85
   private val memoryCache: LruCache<String, Bitmap>
   private val diskDir: File = File(context.filesDir, "thumbnails").apply { mkdirs() }
@@ -86,7 +91,13 @@ class ThumbnailRepository(
       memoryCache.get(key)?.let { return@withContext it }
 
       ongoingOperations[key]?.let {
-        return@withContext it.await()
+        try {
+          return@withContext it.await()
+        } catch (e: CancellationException) {
+          // the other caller scrolled away; if we are still wanted, do the work ourselves
+          if (!isActive) throw e
+          memoryCache.get(key)?.let { hit -> return@withContext hit }
+        }
       }
 
       val deferred =
@@ -104,7 +115,7 @@ class ThumbnailRepository(
 
             // Check if this video should use MediaStore
             val videoKey = videoBaseKey(video)
-            val thumbnail = if (useMediaStoreForVideo.containsKey(videoKey)) {
+            val thumbnail = generationLimit.withPermit { if (useMediaStoreForVideo.containsKey(videoKey)) {
               // Use MediaStore for this video
               android.util.Log.d("ThumbnailRepository", "Using MediaStore for ${video.displayName}")
               generateWithMediaStore(video, diskCacheDimension)
@@ -119,7 +130,7 @@ class ThumbnailRepository(
               } else {
                 fastResult
               }
-            }
+            } }
 
             if (thumbnail == null) {
               return@async null
@@ -244,7 +255,9 @@ class ThumbnailRepository(
     height: Int,
   ): String {
     val base = videoBaseKey(video)
-    return "$base|$width|$height"
+    // Height is not part of the key: the folder prefetch and the cards compute it differently,
+    // which used to stop finished thumbnails from ever reaching the cards.
+    return "$base|$width"
   }
 
   private fun videoBaseKey(video: Video): String {
@@ -263,18 +276,22 @@ class ThumbnailRepository(
     return "$hex.jpg"
   }
 
-  private fun diskKey(video: Video): String {
+  private fun diskKey(video: Video, dimension: Int = diskCacheDimension): String {
     val baseKey = videoBaseKey(video)
     return if (isNetworkUrl(video.path)) {
-      "$baseKey|disk|d$diskCacheDimension|pos3"
+      "$baseKey|disk|d$dimension|pos3"
     } else {
-      "$baseKey|disk|d$diskCacheDimension"
+      "$baseKey|disk|d$dimension"
     }
   }
 
   private fun loadFromDisk(video: Video, targetWidthPx: Int = 0): Bitmap? {
-    val diskFile = File(diskDir, keyToFileName(diskKey(video)))
-    if (!diskFile.exists()) return null
+    var diskFile = File(diskDir, keyToFileName(diskKey(video)))
+    if (!diskFile.exists()) {
+      // thumbnails made by older versions are bigger but still fine, so reuse them
+      diskFile = File(diskDir, keyToFileName(diskKey(video, legacyDiskDimension)))
+      if (!diskFile.exists()) return null
+    }
     return runCatching {
       val options =
         BitmapFactory.Options().apply {

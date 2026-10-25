@@ -109,7 +109,7 @@ fun VideoCard(
           . fillMaxWidth()
           .background(
             if (isSelected) {
-              MaterialTheme.colorScheme.tertiary. copy(alpha = 0.3f)
+              MaterialTheme.colorScheme.secondaryContainer
             } else {
               Color. Transparent
             },
@@ -172,7 +172,7 @@ fun VideoCard(
           if (showThumbnails) {
             thumbnail?.let {
               Image(
-                bitmap = it.asImageBitmap(),
+                bitmap = remember(it) { it.asImageBitmap() },
                 contentDescription = "Thumbnail",
                 modifier = Modifier.matchParentSize(),
                 contentScale = ContentScale.Crop,
@@ -377,7 +377,7 @@ fun VideoCard(
             .fillMaxWidth()
             .background(
               if (isSelected) {
-                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
+                MaterialTheme.colorScheme.secondaryContainer
               } else {
                 Color.Transparent
               },
@@ -444,7 +444,7 @@ fun VideoCard(
           if (showThumbnails) {
             thumbnail?.let {
               Image(
-                bitmap = it.asImageBitmap(),
+                bitmap = remember(it) { it.asImageBitmap() },
                 contentDescription = "Thumbnail",
                 modifier = Modifier.matchParentSize(),
                 contentScale = ContentScale.Crop,
