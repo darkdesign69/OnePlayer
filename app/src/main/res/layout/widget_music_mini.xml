@@ -52,6 +52,16 @@
           android:textSize="12sp"
           android:textStyle="normal" />
     </LinearLayout>
+    <ProgressBar
+        android:id="@+id/w_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="1dp"
+        android:max="1000"
+        android:progress="0"
+        android:progressDrawable="@drawable/widget_progress" />
     <LinearLayout
         android:id="@+id/w_buttons"
         android:layout_width="match_parent"
@@ -61,7 +71,7 @@
       <FrameLayout
           android:id="@+id/w_shuffle"
           android:layout_width="0dp"
-          android:layout_height="44dp"
+          android:layout_height="38dp"
           android:layout_weight="1"
           android:contentDescription="@string/music_widget_shuffle">
         <ImageView
@@ -74,7 +84,7 @@
       <FrameLayout
           android:id="@+id/w_prev"
           android:layout_width="0dp"
-          android:layout_height="44dp"
+          android:layout_height="38dp"
           android:layout_weight="1"
           android:contentDescription="@string/music_widget_prev">
         <ImageView
@@ -87,7 +97,7 @@
       <FrameLayout
           android:id="@+id/w_play"
           android:layout_width="0dp"
-          android:layout_height="44dp"
+          android:layout_height="38dp"
           android:layout_weight="1"
           android:contentDescription="@string/music_widget_play_pause">
         <ImageView
@@ -100,7 +110,7 @@
       <FrameLayout
           android:id="@+id/w_next"
           android:layout_width="0dp"
-          android:layout_height="44dp"
+          android:layout_height="38dp"
           android:layout_weight="1"
           android:contentDescription="@string/music_widget_next">
         <ImageView
@@ -113,7 +123,7 @@
       <FrameLayout
           android:id="@+id/w_repeat"
           android:layout_width="0dp"
-          android:layout_height="44dp"
+          android:layout_height="38dp"
           android:layout_weight="1"
           android:contentDescription="@string/music_widget_repeat">
         <ImageView
@@ -126,7 +136,7 @@
       <FrameLayout
           android:id="@+id/w_fav"
           android:layout_width="0dp"
-          android:layout_height="44dp"
+          android:layout_height="38dp"
           android:layout_weight="1"
           android:contentDescription="@string/music_widget_favourite">
         <ImageView
