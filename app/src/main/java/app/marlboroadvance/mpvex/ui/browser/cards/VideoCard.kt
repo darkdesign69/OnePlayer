@@ -119,7 +119,8 @@ fun VideoCard(
       ) {
         val thumbnailRepository = koinInject<ThumbnailRepository>()
         val thumbWidthDp = 160.dp
-        val aspect = 1f
+        // normal 16:9 thumbnails: one per row, or two side by side
+        val aspect = 16f / 9f
         val thumbWidthPx = with(LocalDensity.current) { thumbWidthDp.roundToPx() }
         val thumbHeightPx = (thumbWidthPx / aspect).roundToInt()
 
