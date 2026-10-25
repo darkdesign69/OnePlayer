@@ -39,16 +39,15 @@ import java.util.concurrent.Executors
 import kotlin.math.max
 import kotlin.math.min
 
-/** The five widgets in the picker. Each starts at its own size and can be resized freely afterwards. */
+/** The four widgets in the picker. Each starts at its own size and can be resized freely within its limits. */
 enum class MusicWidgetKind(
   val defaultWidthDp: Int,
   val defaultHeightDp: Int,
 ) {
-  Capsule(280, 70),
-  Square(150, 150),
-  Mini(180, 70),
-  Album(280, 120),
-  Expanded(280, 150),
+  Small(72, 72),
+  Medium(144, 72),
+  Large(288, 72),
+  Text(144, 72),
 }
 
 abstract class MusicWidgetProvider : AppWidgetProvider() {
@@ -72,15 +71,13 @@ abstract class MusicWidgetProvider : AppWidgetProvider() {
   }
 }
 
-class MusicWidgetCapsuleProvider : MusicWidgetProvider()
+class MusicWidgetSmallProvider : MusicWidgetProvider()
 
-class MusicWidgetSquareProvider : MusicWidgetProvider()
+class MusicWidgetMediumProvider : MusicWidgetProvider()
 
-class MusicWidgetMiniProvider : MusicWidgetProvider()
+class MusicWidgetLargeProvider : MusicWidgetProvider()
 
-class MusicWidgetAlbumProvider : MusicWidgetProvider()
-
-class MusicWidgetExpandedProvider : MusicWidgetProvider()
+class MusicWidgetTextProvider : MusicWidgetProvider()
 
 /** Handles the favourite, repeat and shuffle buttons without opening the app. */
 class MusicWidgetActionReceiver : BroadcastReceiver() {
@@ -113,8 +110,8 @@ class MusicWidgetActionReceiver : BroadcastReceiver() {
  */
 object MusicWidgetUpdater {
   private const val SNAP = "music_widget_state"
-  private const val TICK_MS = 2000L
-  private const val TOUCH_DP = 44
+  private const val TICK_MS = 3000L
+  private const val TOUCH_DP = 38
 
   private val executor = Executors.newSingleThreadExecutor()
   private val main = Handler(Looper.getMainLooper())
@@ -159,11 +156,10 @@ object MusicWidgetUpdater {
 
   private fun providers(): List<Pair<MusicWidgetKind, Class<*>>> =
     listOf(
-      MusicWidgetKind.Capsule to MusicWidgetCapsuleProvider::class.java,
-      MusicWidgetKind.Square to MusicWidgetSquareProvider::class.java,
-      MusicWidgetKind.Mini to MusicWidgetMiniProvider::class.java,
-      MusicWidgetKind.Album to MusicWidgetAlbumProvider::class.java,
-      MusicWidgetKind.Expanded to MusicWidgetExpandedProvider::class.java,
+      MusicWidgetKind.Small to MusicWidgetSmallProvider::class.java,
+      MusicWidgetKind.Medium to MusicWidgetMediumProvider::class.java,
+      MusicWidgetKind.Large to MusicWidgetLargeProvider::class.java,
+      MusicWidgetKind.Text to MusicWidgetTextProvider::class.java,
     )
 
   private fun render(ctx: Context) {
@@ -182,8 +178,8 @@ object MusicWidgetUpdater {
       } catch (_: Throwable) {
       }
     }
-    // keep the progress bar moving while a song plays (only the expanded widget shows it)
-    if (st.playing && all.any { it.first == MusicWidgetKind.Expanded }) main.postDelayed(tick, TICK_MS)
+    // keep the progress line moving while a song plays
+    if (st.playing) main.postDelayed(tick, TICK_MS)
   }
 
   // ---- state ----
@@ -297,6 +293,8 @@ object MusicWidgetUpdater {
 
   private enum class Btn { Shuffle, Prev, Play, Next, Repeat, Fav }
 
+  private enum class Mode { Small, Tall, Row, Text }
+
   private fun build(
     ctx: Context,
     kind: MusicWidgetKind,
@@ -313,13 +311,21 @@ object MusicWidgetUpdater {
       options
         .getInt(if (land) AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT else AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0)
         .takeIf { it > 0 } ?: kind.defaultHeightDp
+
+    // the layout follows the shape: tiny -> cover and buttons, wide -> cover on the left, tall -> cover on top
+    val mode =
+      when {
+        kind == MusicWidgetKind.Text -> Mode.Text
+        wDp < 100 && hDp < 100 -> Mode.Small
+        hDp * 1.15f > wDp -> Mode.Tall
+        else -> Mode.Row
+      }
     val layout =
-      when (kind) {
-        MusicWidgetKind.Capsule -> R.layout.widget_music_capsule
-        MusicWidgetKind.Square -> R.layout.widget_music_square
-        MusicWidgetKind.Mini -> R.layout.widget_music_mini
-        MusicWidgetKind.Album -> R.layout.widget_music_album
-        MusicWidgetKind.Expanded -> R.layout.widget_music_expanded
+      when (mode) {
+        Mode.Small -> R.layout.widget_music_small
+        Mode.Tall -> R.layout.widget_music_tall
+        Mode.Row -> R.layout.widget_music_row
+        Mode.Text -> R.layout.widget_music_text
       }
     val rv = RemoteViews(ctx.packageName, layout)
     val g = Geo(density, wDp, hDp, min(1f, 480f / max(wDp, hDp) / density))
@@ -328,90 +334,74 @@ object MusicWidgetUpdater {
     val avg = averageOf(blur)
     val title = if (st.hasTrack) st.title else ctx.getString(R.string.music_widget_idle_title)
     val artist = if (st.hasTrack) st.artist else ctx.getString(R.string.music_widget_idle_artist)
+    val ratio = if (st.durMs > 0) (st.posMs.toFloat() / st.durMs).coerceIn(0f, 1f) else 0f
 
-    val look: Look
-    val priority: List<Btn>
+    val look = Look(0xFFFFFFFF.toInt(), 0xFFB9C4E8.toInt(), 0xFFFFFFFF.toInt(), 0x80FFFFFF.toInt(), ACCENT)
+    val showTitle: Boolean
+    val showArtist: Boolean
+    val showProgress: Boolean
     val avail: Int
-    var showProgress = true
-    when (kind) {
-      MusicWidgetKind.Capsule -> {
-        // the cover is its own view (a circle as high as the pill), so the text can never run over it
-        avail = wDp - (hDp - 14) - 2 - 12
-        rv.setImageViewBitmap(R.id.w_bg, capsuleBg(g, blur, avg))
-        rv.setImageViewBitmap(R.id.w_art, artOf(cover, 256, 0.5f))
-        pad(rv, g, 0, 2, 0, 2)
-        look = Look(0xFFFFFFFF.toInt(), 0xFFBFC0C8.toInt(), 0xFFFFFFFF.toInt(), 0x99FFFFFF.toInt(), KIT_ACCENT)
-        priority = listOf(Btn.Play, Btn.Prev, Btn.Next, Btn.Shuffle, Btn.Repeat, Btn.Fav)
-        text(rv, if (artist.isNotBlank() && st.hasTrack) "$title - $artist" else title, null, look, 13f, 11f, true, false)
+    val heartCorner: Boolean
+    var priority: List<Btn> = listOf(Btn.Play, Btn.Prev, Btn.Next, Btn.Repeat, Btn.Shuffle)
+    when (mode) {
+      Mode.Small -> {
+        showTitle = false
+        showArtist = false
+        showProgress = false
+        avail = wDp - 8
+        heartCorner = true
+        rv.setImageViewBitmap(R.id.w_art, roundedArt(cover))
       }
-      MusicWidgetKind.Square -> {
+      Mode.Tall -> {
+        showTitle = hDp >= 118
+        showArtist = hDp >= 148
+        showProgress = hDp >= 132
         avail = wDp - 16
-        rv.setImageViewBitmap(R.id.w_bg, squareBg(g, blur, avg))
-        rv.setImageViewBitmap(R.id.w_art, artOf(cover, 300, 0.1f))
-        pad(rv, g, 8, 4, 8, 6)
-        val dark = 0xFF1D1630.toInt()
-        look = Look(0xFF1B1430.toInt(), 0xFF33254A.toInt(), dark, ColorUtils.setAlphaComponent(dark, 0x88), 0xFF7A3FE0.toInt())
-        val overlays = wDp >= 110 && hDp >= 110
-        priority = listOf(Btn.Play, Btn.Prev, Btn.Next) + if (overlays) emptyList() else listOf(Btn.Repeat, Btn.Fav, Btn.Shuffle)
-        text(rv, title, artist, look, (hDp / 9f).coerceIn(13f, 17f), 11f, true, hDp >= 140)
-        rv.setViewVisibility(R.id.w_ov_repeat, vis(overlays))
-        rv.setViewVisibility(R.id.w_ov_fav, vis(overlays))
-        if (overlays) {
-          overlay(ctx, rv, R.id.w_ov_repeat, R.id.w_ov_repeat_icon, repeatRes(st.repeat), if (st.repeat != 0) KIT_ACCENT else 0xFFFFFFFF.toInt(), MusicWidgetActionReceiver.ACTION_REPEAT, 105)
-          overlay(ctx, rv, R.id.w_ov_fav, R.id.w_ov_fav_icon, favRes(st.fav), if (st.fav) FAV_ON else 0xFFFFFFFF.toInt(), MusicWidgetActionReceiver.ACTION_FAVORITE, 104)
-        }
+        heartCorner = wDp >= 100
+        rv.setImageViewBitmap(R.id.w_art, roundedArt(cover))
       }
-      MusicWidgetKind.Mini -> {
+      Mode.Row -> {
+        showTitle = hDp >= 50
+        showArtist = hDp >= 84
+        showProgress = hDp >= 100 && wDp >= 200
+        avail = wDp - (hDp - 12) - 6 - 8 - 6 - 4
+        heartCorner = kind != MusicWidgetKind.Large
+        rv.setImageViewBitmap(R.id.w_art, roundedArt(cover))
+      }
+      Mode.Text -> {
+        showTitle = true
+        showArtist = hDp >= 88
+        showProgress = hDp >= 108
         avail = wDp - 16
-        rv.setImageViewBitmap(R.id.w_bg, miniBg(g, blur, avg))
-        pad(rv, g, 8, 4, 8, 4)
-        look = Look(0xFFEAF8F8.toInt(), 0xFFA9D0D1.toInt(), 0xFFFFFFFF.toInt(), 0x99FFFFFF.toInt(), KIT_ACCENT)
-        priority = listOf(Btn.Play, Btn.Prev, Btn.Next, Btn.Fav, Btn.Repeat, Btn.Shuffle)
-        text(rv, title, artist, look, 14f, 12f, true, hDp >= 100)
-      }
-      MusicWidgetKind.Album, MusicWidgetKind.Expanded -> {
-        val expanded = kind == MusicWidgetKind.Expanded
-        val inset = 10
-        val side = if (expanded) min(hDp - inset * 2, (wDp * 0.4f).toInt()) else hDp - inset * 2
-        val showArt = wDp >= 150 && side >= 50
-        val padStart = if (showArt) inset + side + 12 else 12
-        avail = wDp - padStart - 10
-        rv.setImageViewBitmap(R.id.w_bg, albumBg(g, blur, avg, expanded))
-        rv.setViewVisibility(R.id.w_art, vis(showArt))
-        if (showArt) rv.setImageViewBitmap(R.id.w_art, artOf(cover, 300, 0.16f))
-        pad(rv, g, if (showArt) 0 else 12, 4, 0, 4)
-        showProgress = hDp >= 84
-        look =
-          Look(
-            0xFFFFFFFF.toInt(),
-            if (expanded) 0xFFC5CCD8.toInt() else 0xFF9CB9F2.toInt(),
-            0xFFFFFFFF.toInt(),
-            0x99FFFFFF.toInt(),
-            KIT_ACCENT,
-          )
-        val showOv = wDp >= 150 && hDp >= 70
-        priority = listOf(Btn.Play, Btn.Prev, Btn.Next, Btn.Repeat, Btn.Shuffle) + if (showOv) emptyList() else listOf(Btn.Fav)
-        val showTitle = true
-        val showArtist = hDp >= (if (expanded) 100 else 96)
-        text(rv, title, artist, look, (hDp / 7f).coerceIn(14f, 20f), (hDp / 9f).coerceIn(11f, 15f), showTitle, showArtist)
-        // keep the text clear of the heart in the corner
-        rv.setViewPadding(R.id.w_title_area, 0, 0, if (showOv) g.px(22) else 0, 0)
-        rv.setViewVisibility(R.id.w_ov_fav, vis(showOv))
-        if (showOv) {
-          overlay(ctx, rv, R.id.w_ov_fav, R.id.w_ov_fav_icon, favRes(st.fav), if (st.fav) FAV_ON else 0xFFFFFFFF.toInt(), MusicWidgetActionReceiver.ACTION_FAVORITE, 104)
-        }
+        heartCorner = false
+        rv.setViewVisibility(R.id.w_note, vis(hDp >= 96))
+        priority = listOf(Btn.Play, Btn.Prev, Btn.Next, Btn.Fav, Btn.Shuffle, Btn.Repeat)
       }
     }
-    // progress bar in every widget
-    val ratio = if (st.durMs > 0) (st.posMs.toFloat() / st.durMs).coerceIn(0f, 1f) else 0f
-    rv.setViewVisibility(R.id.w_progress, vis(showProgress))
-    rv.setProgressBar(R.id.w_progress, 1000, (ratio * 1000).toInt(), false)
-    buttons(ctx, rv, st, look, priority, avail, rewind = kind == MusicWidgetKind.Album || kind == MusicWidgetKind.Expanded)
+    if (mode != Mode.Text && !heartCorner) priority = listOf(Btn.Play, Btn.Prev, Btn.Next, Btn.Repeat, Btn.Fav, Btn.Shuffle)
+    if (mode != Mode.Small && mode != Mode.Text && heartCorner) priority = listOf(Btn.Play, Btn.Prev, Btn.Next, Btn.Repeat, Btn.Shuffle)
+    rv.setImageViewBitmap(R.id.w_bg, glassBg(g, blur, avg, if (showProgress) -1f else ratio))
+
+    text(rv, title, artist, look, showTitle, showArtist)
+    if (mode != Mode.Small) {
+      rv.setViewVisibility(R.id.w_progress_row, vis(showProgress))
+      rv.setProgressBar(R.id.w_progress, 1000, (ratio * 1000).toInt(), false)
+      rv.setTextViewText(R.id.w_elapsed, fmt(st.posMs))
+      rv.setTextViewText(R.id.w_total, fmt(st.durMs))
+    }
+    rv.setViewVisibility(R.id.w_ov_fav, vis(heartCorner))
+    if (heartCorner) {
+      rv.setImageViewResource(R.id.w_ov_fav_icon, favRes(st.fav))
+      rv.setInt(R.id.w_ov_fav_icon, "setColorFilter", if (st.fav) FAV_ON else 0xFFFFFFFF.toInt())
+      rv.setOnClickPendingIntent(R.id.w_ov_fav, broadcast(ctx, MusicWidgetActionReceiver.ACTION_FAVORITE, 104))
+    }
+    buttons(ctx, rv, st, look, if (mode == Mode.Small) listOf(Btn.Play, Btn.Prev, Btn.Next) else priority, avail)
 
     // everything else (background, cover, title) opens the player on the Now Playing screen
     val open = openApp(ctx)
     rv.setOnClickPendingIntent(R.id.w_root, open)
     rv.setOnClickPendingIntent(R.id.w_title_area, open)
+    rv.setOnClickPendingIntent(R.id.w_art, open)
     return rv
   }
 
@@ -426,23 +416,13 @@ object MusicWidgetUpdater {
 
     /** dp -> pixels of the background bitmap */
     fun b(dp: Float) = dp * density * scale
-
-    fun px(dp: Int) = (dp * density).toInt()
   }
 
   private val FAV_ON = 0xFFFF5C8A.toInt()
-  private val KIT_ACCENT = 0xFFFFB38B.toInt()
+  private val ACCENT = 0xFF8AB4FF.toInt()
+  private val DARK = 0xFF14142B.toInt()
 
   private fun vis(v: Boolean) = if (v) View.VISIBLE else View.GONE
-
-  private fun pad(
-    rv: RemoteViews,
-    g: Geo,
-    l: Int,
-    t: Int,
-    r: Int,
-    b: Int,
-  ) = rv.setViewPadding(R.id.w_content, g.px(l), g.px(t), g.px(r), g.px(b))
 
   private fun favRes(on: Boolean) = if (on) R.drawable.wg_fav_on else R.drawable.wg_fav
 
@@ -453,27 +433,31 @@ object MusicWidgetUpdater {
       else -> R.drawable.wg_repeat_off
     }
 
+  private fun fmt(ms: Long): String {
+    val s = (ms / 1000).coerceAtLeast(0)
+    return "%d:%02d".format(s / 60, s % 60)
+  }
+
   private fun text(
     rv: RemoteViews,
     title: String,
-    subtitle: String?,
+    artist: String,
     look: Look,
-    titleDp: Float,
-    artistDp: Float,
     showTitle: Boolean,
     showArtist: Boolean,
   ) {
     rv.setTextViewText(R.id.w_title, title)
-    rv.setTextViewText(R.id.w_artist, subtitle ?: "")
+    rv.setTextViewText(R.id.w_artist, artist)
     rv.setTextColor(R.id.w_title, look.title)
     rv.setTextColor(R.id.w_artist, look.sub)
-    rv.setTextViewTextSize(R.id.w_title, TypedValue.COMPLEX_UNIT_DIP, titleDp)
-    rv.setTextViewTextSize(R.id.w_artist, TypedValue.COMPLEX_UNIT_DIP, artistDp)
     rv.setViewVisibility(R.id.w_title_area, vis(showTitle))
-    rv.setViewVisibility(R.id.w_artist, vis(showArtist && subtitle != null))
+    rv.setViewVisibility(R.id.w_artist, vis(showArtist))
   }
 
-  /** Shows as many buttons as fit at full touch size, most important first, and wires them all. */
+  /**
+   * Shows as many buttons as fit, most important first, and wires them all.
+   * Previous, play and next are always there, whatever the size.
+   */
   private fun buttons(
     ctx: Context,
     rv: RemoteViews,
@@ -481,9 +465,8 @@ object MusicWidgetUpdater {
     look: Look,
     priority: List<Btn>,
     availDp: Int,
-    rewind: Boolean = false,
   ) {
-    val n = ((availDp + 8) / TOUCH_DP).coerceIn(min(3, priority.size), priority.size)
+    val n = ((availDp + 4) / TOUCH_DP).coerceIn(min(3, priority.size), priority.size)
     val shown = priority.take(n).toSet()
     fun id(b: Btn) =
       when (b) {
@@ -505,37 +488,22 @@ object MusicWidgetUpdater {
       }
     for (b in Btn.values()) rv.setViewVisibility(id(b), vis(b in shown))
     rv.setImageViewResource(R.id.w_play_icon, if (st.playing) R.drawable.wg_pause else R.drawable.wg_play)
-    rv.setImageViewResource(R.id.w_prev_icon, if (rewind) R.drawable.wg_rew else R.drawable.wg_prev)
-    rv.setImageViewResource(R.id.w_next_icon, if (rewind) R.drawable.wg_ffw else R.drawable.wg_next)
+    rv.setImageViewResource(R.id.w_prev_icon, R.drawable.wg_prev)
+    rv.setImageViewResource(R.id.w_next_icon, R.drawable.wg_next)
     rv.setImageViewResource(R.id.w_repeat_icon, repeatRes(st.repeat))
     rv.setImageViewResource(R.id.w_fav_icon, favRes(st.fav))
-    rv.setInt(icon(Btn.Play), "setColorFilter", look.icon)
+    rv.setInt(icon(Btn.Play), "setColorFilter", DARK)
     rv.setInt(icon(Btn.Prev), "setColorFilter", look.icon)
     rv.setInt(icon(Btn.Next), "setColorFilter", look.icon)
     rv.setInt(icon(Btn.Shuffle), "setColorFilter", if (st.shuffle) look.active else look.dim)
     rv.setInt(icon(Btn.Repeat), "setColorFilter", if (st.repeat != 0) look.active else look.dim)
-    rv.setInt(icon(Btn.Fav), "setColorFilter", if (st.fav) FAV_ON else look.dim)
+    rv.setInt(icon(Btn.Fav), "setColorFilter", if (st.fav) FAV_ON else look.icon)
     rv.setOnClickPendingIntent(R.id.w_play, service(ctx, MusicPlaybackService.ACTION_TOGGLE, 101))
     rv.setOnClickPendingIntent(R.id.w_prev, service(ctx, MusicPlaybackService.ACTION_PREV, 102))
     rv.setOnClickPendingIntent(R.id.w_next, service(ctx, MusicPlaybackService.ACTION_NEXT, 103))
     rv.setOnClickPendingIntent(R.id.w_fav, broadcast(ctx, MusicWidgetActionReceiver.ACTION_FAVORITE, 104))
     rv.setOnClickPendingIntent(R.id.w_repeat, broadcast(ctx, MusicWidgetActionReceiver.ACTION_REPEAT, 105))
     rv.setOnClickPendingIntent(R.id.w_shuffle, broadcast(ctx, MusicWidgetActionReceiver.ACTION_SHUFFLE, 106))
-  }
-
-  private fun overlay(
-    ctx: Context,
-    rv: RemoteViews,
-    box: Int,
-    icon: Int,
-    res: Int,
-    tint: Int,
-    action: String,
-    code: Int,
-  ) {
-    rv.setImageViewResource(icon, res)
-    rv.setInt(icon, "setColorFilter", tint)
-    rv.setOnClickPendingIntent(box, broadcast(ctx, action, code))
   }
 
   private fun service(
@@ -572,124 +540,55 @@ object MusicWidgetUpdater {
       PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
-  // ---- backgrounds: each widget is one bitmap, drawn at a size that keeps the update small ----
+  // ---- artwork is its own view, so it always sits next to the text whatever size the launcher reports ----
 
-  private fun canvasFor(
+  private fun roundedArt(cover: Bitmap): Bitmap {
+    val s = 256
+    val out = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
+    val p = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    p.shader = BitmapShader(centerCrop(cover, s, s), Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+    Canvas(out).drawRoundRect(RectF(0f, 0f, s.toFloat(), s.toFloat()), s * 0.16f, s * 0.16f, p)
+    return out
+  }
+
+  /** Blurred cover under a dark blue glass tint, rounded, with a thin play line along the bottom when there is no progress bar. */
+  private fun glassBg(
     g: Geo,
-    radiusDp: Float,
-  ): Triple<Bitmap, Canvas, RectF> {
+    blur: Bitmap?,
+    avg: Int,
+    lineRatio: Float,
+  ): Bitmap {
     val bmp = Bitmap.createBitmap(g.bw, g.bh, Bitmap.Config.ARGB_8888)
     val c = Canvas(bmp)
-    return Triple(bmp, c, RectF(0f, 0f, g.bw.toFloat(), g.bh.toFloat()))
-  }
-
-  /** Cuts the bitmap to a rounded shape with smooth edges. */
-  private fun round(
-    bmp: Bitmap,
-    g: Geo,
-    radiusDp: Float,
-  ) {
-    val r = min(g.b(radiusDp), min(g.bw, g.bh) / 2f)
+    val rect = RectF(0f, 0f, g.bw.toFloat(), g.bh.toFloat())
+    if (blur != null) c.drawBitmap(centerCrop(blur, g.bw, g.bh), 0f, 0f, Paint(Paint.FILTER_BITMAP_FLAG))
+    val tint = Paint()
+    tint.color = ColorUtils.setAlphaComponent(ColorUtils.blendARGB(avg, 0xFF0B1230.toInt(), 0.72f), 0xDC)
+    c.drawRect(rect, tint)
+    if (lineRatio >= 0f) {
+      val l = g.b(14f)
+      val r = g.bw - l
+      val h = max(2f, g.b(3f))
+      val bottom = g.bh - g.b(4f)
+      val p = Paint(Paint.ANTI_ALIAS_FLAG)
+      p.color = 0x44FFFFFF
+      c.drawRoundRect(RectF(l, bottom - h, r, bottom), h / 2, h / 2, p)
+      p.color = 0xFFFFFFFF.toInt()
+      if (lineRatio > 0f) c.drawRoundRect(RectF(l, bottom - h, l + (r - l) * lineRatio, bottom), h / 2, h / 2, p)
+    }
+    val rad = min(g.b(16f), min(g.bw, g.bh) / 2f)
     val mask = Bitmap.createBitmap(g.bw, g.bh, Bitmap.Config.ARGB_8888)
-    Canvas(mask).drawRoundRect(RectF(0f, 0f, g.bw.toFloat(), g.bh.toFloat()), r, r, Paint(Paint.ANTI_ALIAS_FLAG))
-    val p = Paint()
-    p.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
-    Canvas(bmp).drawBitmap(mask, 0f, 0f, p)
-  }
-
-  /** Blurred cover stretched over [rect], covered by a flat tint. */
-  private fun wash(
-    c: Canvas,
-    blur: Bitmap?,
-    rect: RectF,
-    tint: Int,
-    alpha: Int,
-  ) {
-    val w = max(1, rect.width().toInt())
-    val h = max(1, rect.height().toInt())
-    if (blur != null) c.drawBitmap(centerCrop(blur, w, h), rect.left, rect.top, Paint(Paint.FILTER_BITMAP_FLAG))
-    val p = Paint()
-    p.color = ColorUtils.setAlphaComponent(tint, alpha)
-    c.drawRect(rect, p)
-  }
-
-  private fun frame(
-    c: Canvas,
-    g: Geo,
-    radiusDp: Float,
-  ) {
+    Canvas(mask).drawRoundRect(rect, rad, rad, Paint(Paint.ANTI_ALIAS_FLAG))
+    val mp = Paint()
+    mp.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+    c.drawBitmap(mask, 0f, 0f, mp)
     val sw = max(1f, g.b(1f))
-    val r = min(g.b(radiusDp), min(g.bw, g.bh) / 2f)
-    val p = Paint(Paint.ANTI_ALIAS_FLAG)
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = sw
-    p.color = 0x2AFFFFFF
-    c.drawRoundRect(RectF(sw / 2, sw / 2, g.bw - sw / 2, g.bh - sw / 2), r, r, p)
-  }
-
-  private fun capsuleBg(
-    g: Geo,
-    blur: Bitmap?,
-    avg: Int,
-  ): Bitmap {
-    val (bmp, c, rect) = canvasFor(g, g.hDp / 2f)
-    wash(c, blur, rect, ColorUtils.blendARGB(avg, 0xFF202228.toInt(), 0.8f), 0xE0)
-    round(bmp, g, g.hDp / 2f)
-    frame(c, g, g.hDp / 2f)
+    val bp = Paint(Paint.ANTI_ALIAS_FLAG)
+    bp.style = Paint.Style.STROKE
+    bp.strokeWidth = sw
+    bp.color = 0x40FFFFFF
+    c.drawRoundRect(RectF(sw / 2, sw / 2, g.bw - sw / 2, g.bh - sw / 2), rad, rad, bp)
     return bmp
-  }
-
-  private fun squareBg(
-    g: Geo,
-    blur: Bitmap?,
-    avg: Int,
-  ): Bitmap {
-    val (bmp, c, rect) = canvasFor(g, 26f)
-    wash(c, blur, rect, ColorUtils.blendARGB(avg, Color.WHITE, 0.74f), 0xE8)
-    round(bmp, g, 26f)
-    frame(c, g, 26f)
-    return bmp
-  }
-
-  private fun miniBg(
-    g: Geo,
-    blur: Bitmap?,
-    avg: Int,
-  ): Bitmap {
-    val (bmp, c, rect) = canvasFor(g, 20f)
-    wash(c, blur, rect, ColorUtils.blendARGB(avg, 0xFF073F43.toInt(), 0.62f), 0xD0)
-    round(bmp, g, 20f)
-    frame(c, g, 20f)
-    return bmp
-  }
-
-  private fun albumBg(
-    g: Geo,
-    blur: Bitmap?,
-    avg: Int,
-    expanded: Boolean,
-  ): Bitmap {
-    val (bmp, c, rect) = canvasFor(g, 24f)
-    val base = if (expanded) 0xFF394354.toInt() else 0xFF24365F.toInt()
-    wash(c, blur, rect, ColorUtils.blendARGB(avg, base, if (expanded) 0.66f else 0.7f), 0xE2)
-    round(bmp, g, 24f)
-    frame(c, g, 24f)
-    return bmp
-  }
-
-  /** The cover as a square bitmap with rounded corners ([frac] 0.5 = a circle). */
-  private fun artOf(
-    cover: Bitmap,
-    size: Int,
-    frac: Float,
-  ): Bitmap {
-    val sq = squareCrop(cover, size)
-    val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-    val p = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-    p.shader = BitmapShader(sq, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
-    val r = size * frac
-    Canvas(out).drawRoundRect(RectF(0f, 0f, size.toFloat(), size.toFloat()), r, r, p)
-    return out
   }
 
   private fun averageOf(blur: Bitmap?): Int =
