@@ -175,8 +175,12 @@ fun CustomBackgroundLayer(
   version: Int,
   blur: Float,
   modifier: Modifier = Modifier,
-  dim: Float = 0f,
+  dim: Float? = null,
 ) {
+  // the dark overlay comes from the saved setting unless a value is given (the live preview gives one)
+  val dimPrefs = koinInject<AppearancePreferences>()
+  val savedDim by dimPrefs.customBackgroundDim.collectAsState()
+  val dimAmount = dim ?: savedDim
   val preset = backgroundPresetFor(mode)
   val image = rememberBackgroundBitmap(mode, version)
 
@@ -199,8 +203,8 @@ fun CustomBackgroundLayer(
       )
     }
     // Dark overlay: 0 = the picture as it is, 1 = almost black
-    if (dim > 0.01f) {
-      Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = (dim * 0.9f).coerceIn(0f, 0.9f))))
+    if (dimAmount > 0.01f) {
+      Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = (dimAmount * 0.9f).coerceIn(0f, 0.9f))))
     }
   }
 }
