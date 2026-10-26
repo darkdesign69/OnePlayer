@@ -372,6 +372,21 @@ object FolderListScreen : Screen {
           ) {
             // Empty content for SearchBar
           }
+        } else if (!selectionManager.isInSelectionMode) {
+          HomeHeader(
+            title = stringResource(app.marlboroadvance.mpvex.R.string.app_name),
+            isGrid = mediaLayoutMode == MediaLayoutMode.GRID,
+            onSearchClick = { isSearching = !isSearching },
+            onToggleLayout = {
+              browserPreferences.mediaLayoutMode.set(
+                if (mediaLayoutMode == MediaLayoutMode.GRID) MediaLayoutMode.LIST else MediaLayoutMode.GRID,
+              )
+            },
+            onSortClick = { sortDialogOpen.value = true },
+            onSettingsClick = {
+              backstack.add(app.marlboroadvance.mpvex.ui.preferences.PreferencesScreen)
+            },
+          )
         } else {
           BrowserTopBar(
             title = stringResource(app.marlboroadvance.mpvex.R.string.app_name),
@@ -763,12 +778,13 @@ private fun GridContent(
       state = gridState,
       modifier = Modifier.fillMaxSize(),
       contentPadding = PaddingValues(
-        start = 8.dp,
-        end = 8.dp,
-        bottom = navigationBarHeight
+        start = 14.dp,
+        end = 14.dp,
+        top = 6.dp,
+        bottom = navigationBarHeight + 80.dp
       ),
-      horizontalArrangement = Arrangement.spacedBy(4.dp),
-      verticalArrangement = Arrangement.spacedBy(4.dp),
+      horizontalArrangement = Arrangement.spacedBy(10.dp),
+      verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
       items(folders.size, key = { index -> folders[index].bucketId }) { index ->
         val folder = folders[index]

@@ -17,6 +17,9 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.IconButton
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -81,56 +84,33 @@ fun FolderCard(
         onClick = onClick,
         onLongClick = onLongClick,
       ),
-    colors = CardDefaults. cardColors(containerColor = Color. Transparent),
+    shape = if (isGridMode) RoundedCornerShape(22.dp) else CardDefaults.shape,
+    colors =
+      CardDefaults.cardColors(
+        containerColor =
+          when {
+            !isGridMode -> Color.Transparent
+            isSelected -> MaterialTheme.colorScheme.secondaryContainer
+            else -> MaterialTheme.colorScheme.surfaceContainer
+          },
+      ),
   ) {
     if (isGridMode) {
-      // GRID LAYOUT - Vertical arrangement
-      Column(
-        modifier = Modifier
-          . fillMaxWidth()
-          .background(
-            if (isSelected) MaterialTheme.colorScheme.tertiary. copy(alpha = 0.3f) else Color.Transparent,
-          )
-          .padding(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-      ) {
-        val folderGridColumnsPortrait by browserPreferences.folderGridColumnsPortrait.collectAsState()
-        val folderGridColumnsLandscape by browserPreferences.folderGridColumnsLandscape.collectAsState()
-        val configuration = LocalConfiguration.current
-        val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-        val folderGridColumns = if (isLandscape) folderGridColumnsLandscape else folderGridColumnsPortrait
-        val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
-        val horizontalPadding = 32.dp
-        val spacing = 8.dp
-
-        val thumbWidthDp = if (folderGridColumns > 1) {
-          // (screen - padding - total spacing) / columns
-          val totalSpacing = spacing * (folderGridColumns - 1)
-          ((screenWidthDp - horizontalPadding - totalSpacing) / folderGridColumns).coerceAtLeast(120.dp)
-        } else {
-          // single column fallback
-          160.dp
-        }
-        val aspect = 16f / 9f
-        val thumbHeightDp = thumbWidthDp / aspect
-
-        val context = LocalContext.current
-        
-        Box(
+      // GRID LAYOUT - rounded tile: folder icon, name and count, a badge for new videos and a menu button
+      Box(modifier = Modifier.fillMaxWidth()) {
+        Column(
           modifier = Modifier
-            .width(thumbWidthDp)
-            .height(thumbHeightDp)
-            .combinedClickable(
-              onClick = onThumbClick,
-              onLongClick = onLongClick,
-            ),
-          contentAlignment = Alignment.Center,
+            .fillMaxWidth()
+            .padding(start = 14.dp, top = 16.dp, end = 4.dp, bottom = 8.dp),
         ) {
-          // Plain folder icon, no box around it
           Box(
             modifier = Modifier
-              .height(thumbHeightDp)
-              .aspectRatio(1.15f),
+              .height(48.dp)
+              .aspectRatio(1.15f)
+              .combinedClickable(
+                onClick = onThumbClick,
+                onLongClick = onLongClick,
+              ),
           ) {
             if (customIcon != null) {
               Icon(
@@ -148,62 +128,61 @@ fun FolderCard(
                 colorFilter = rememberAccentColorFilter(),
               )
             }
+          }
 
-            if (newVideoCount > 0) {
-              Box(
-                modifier =
-                  Modifier
-                    .align(Alignment.TopEnd)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0xFFD32F2F))
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
-              ) {
+          Spacer(modifier = Modifier.height(14.dp))
+
+          Row(verticalAlignment = Alignment.Bottom) {
+            Column(modifier = Modifier.weight(1f)) {
+              Text(
+                folder.name,
+                style = MaterialTheme.typography.titleSmall,
+                color = if (isRecentlyPlayed) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface,
+                maxLines = maxLines,
+                overflow = TextOverflow.Ellipsis,
+              )
+              if (showTotalVideosChip && folder.videoCount > 0) {
+                val countText = if (folder.videoCount == 1) "1 video" else "${folder.videoCount} videos"
                 Text(
-                  text = newVideoCount.toString(),
-                  style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                  ),
-                  color = Color.White,
+                  if (showTotalDurationChip && folder.totalDuration > 0) "$countText • ${formatDuration(folder.totalDuration)}" else countText,
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                  maxLines = 1,
+                  overflow = TextOverflow.Ellipsis,
                 )
               }
             }
-
-            if (showTotalDurationChip && folder.totalDuration > 0) {
-              Box(
-                modifier = Modifier
-                  .align(Alignment.BottomEnd)
-                  .padding(4.dp)
-                  .clip(RoundedCornerShape(4.dp))
-                  .background(Color.Black.copy(alpha = 0.65f))
-                  .padding(horizontal = 6.dp, vertical = 2.dp),
-              ) {
-                Text(
-                  text = formatDuration(folder.totalDuration),
-                  style = MaterialTheme.typography.labelSmall,
-                  color = Color.White,
-                )
-              }
+            IconButton(
+              onClick = { onLongClick?.invoke() },
+              modifier = Modifier.size(32.dp),
+            ) {
+              Icon(
+                Icons.Filled.MoreVert,
+                contentDescription = "Select",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+              )
             }
           }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-          folder.name,
-          style = MaterialTheme.typography.titleSmall,
-          color = if (isRecentlyPlayed) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface,
-          maxLines = maxLines,
-          overflow = TextOverflow. Ellipsis,
-          textAlign = androidx.compose.ui. text.style.TextAlign.Center,
-        )
-
-        if (showTotalVideosChip && folder.videoCount > 0) {
-          Text(
-            if (folder.videoCount == 1) "1 Video" else "${folder.videoCount} Videos",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme. onSurfaceVariant,
-          )
+        if (newVideoCount > 0) {
+          Box(
+            modifier = Modifier
+              .align(Alignment.TopEnd)
+              .padding(top = 8.dp, end = 8.dp)
+              .size(26.dp)
+              .clip(CircleShape)
+              .background(Color(0xFFFF5C6C)),
+            contentAlignment = Alignment.Center,
+          ) {
+            Text(
+              text = newVideoCount.toString(),
+              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+              color = Color.White,
+              maxLines = 1,
+            )
+          }
         }
       }
     } else {
@@ -212,7 +191,7 @@ fun FolderCard(
           Modifier
             .fillMaxWidth()
             .background(
-              if (isSelected) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f) else Color.Transparent,
+              if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
             )
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
