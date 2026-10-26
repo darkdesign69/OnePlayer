@@ -128,6 +128,11 @@ fun SortDialog(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
           }
 
+          GridColumnsSection(
+            folderGridColumnSelector = folderGridColumnSelector,
+            videoGridColumnSelector = videoGridColumnSelector,
+          )
+
           if (showSortOptions) {
             SectionTitle("Sort")
             GridOf(
@@ -153,41 +158,6 @@ fun SortDialog(
             )
             Spacer(Modifier.height(4.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-          }
-
-          GridColumnsSection(
-            folderGridColumnSelector = folderGridColumnSelector,
-            videoGridColumnSelector = videoGridColumnSelector,
-          )
-
-          if (visibilityToggles.isNotEmpty()) {
-            CollapsibleSection(title = "Fields", startExpanded = true) {
-              GridOf(columns = 3, count = visibilityToggles.size) { index, cellModifier ->
-                val toggle = visibilityToggles[index]
-                Row(
-                  modifier =
-                    cellModifier
-                      .clip(RoundedCornerShape(8.dp))
-                      .clickable { toggle.onCheckedChange(!toggle.checked) }
-                      .padding(vertical = 6.dp, horizontal = 4.dp),
-                  verticalAlignment = Alignment.CenterVertically,
-                  horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                  Checkbox(
-                    checked = toggle.checked,
-                    onCheckedChange = null,
-                    modifier = Modifier.size(20.dp),
-                  )
-                  Text(
-                    text = toggle.label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                  )
-                }
-              }
-            }
           }
 
           if (advancedToggles.isNotEmpty()) {

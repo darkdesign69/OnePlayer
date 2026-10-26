@@ -84,28 +84,25 @@ fun FolderCard(
         onClick = onClick,
         onLongClick = onLongClick,
       ),
-    shape = if (isGridMode) RoundedCornerShape(22.dp) else CardDefaults.shape,
+    shape = if (isGridMode) RoundedCornerShape(16.dp) else CardDefaults.shape,
     colors =
       CardDefaults.cardColors(
         containerColor =
-          when {
-            !isGridMode -> Color.Transparent
-            isSelected -> MaterialTheme.colorScheme.secondaryContainer
-            else -> MaterialTheme.colorScheme.surfaceContainer
-          },
+          if (isGridMode && isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
       ),
   ) {
     if (isGridMode) {
-      // GRID LAYOUT - rounded tile: folder icon, name and count, a badge for new videos and a menu button
+      // GRID LAYOUT - plain folder icon with its name and count underneath, and a red badge for new videos
       Box(modifier = Modifier.fillMaxWidth()) {
         Column(
           modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 14.dp, top = 16.dp, end = 4.dp, bottom = 8.dp),
+            .padding(horizontal = 4.dp, vertical = 10.dp),
+          horizontalAlignment = Alignment.CenterHorizontally,
         ) {
           Box(
             modifier = Modifier
-              .height(48.dp)
+              .height(52.dp)
               .aspectRatio(1.15f)
               .combinedClickable(
                 onClick = onThumbClick,
@@ -130,48 +127,35 @@ fun FolderCard(
             }
           }
 
-          Spacer(modifier = Modifier.height(14.dp))
+          Spacer(modifier = Modifier.height(8.dp))
 
-          Row(verticalAlignment = Alignment.Bottom) {
-            Column(modifier = Modifier.weight(1f)) {
-              Text(
-                folder.name,
-                style = MaterialTheme.typography.titleSmall,
-                color = if (isRecentlyPlayed) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface,
-                maxLines = maxLines,
-                overflow = TextOverflow.Ellipsis,
-              )
-              if (showTotalVideosChip && folder.videoCount > 0) {
-                val countText = if (folder.videoCount == 1) "1 video" else "${folder.videoCount} videos"
-                Text(
-                  if (showTotalDurationChip && folder.totalDuration > 0) "$countText • ${formatDuration(folder.totalDuration)}" else countText,
-                  style = MaterialTheme.typography.bodySmall,
-                  color = MaterialTheme.colorScheme.onSurfaceVariant,
-                  maxLines = 1,
-                  overflow = TextOverflow.Ellipsis,
-                )
-              }
-            }
-            IconButton(
-              onClick = { onLongClick?.invoke() },
-              modifier = Modifier.size(32.dp),
-            ) {
-              Icon(
-                Icons.Filled.MoreVert,
-                contentDescription = "Select",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp),
-              )
-            }
+          Text(
+            folder.name,
+            style = MaterialTheme.typography.titleSmall,
+            color = if (isRecentlyPlayed) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface,
+            maxLines = maxLines,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+          )
+          if (showTotalVideosChip && folder.videoCount > 0) {
+            val countText = if (folder.videoCount == 1) "1 video" else "${folder.videoCount} videos"
+            Text(
+              if (showTotalDurationChip && folder.totalDuration > 0) "$countText • ${formatDuration(folder.totalDuration)}" else countText,
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+              textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
           }
         }
 
         if (newVideoCount > 0) {
           Box(
             modifier = Modifier
-              .align(Alignment.TopEnd)
-              .padding(top = 8.dp, end = 8.dp)
-              .size(26.dp)
+              .align(Alignment.TopCenter)
+              .padding(start = 56.dp)
+              .size(24.dp)
               .clip(CircleShape)
               .background(Color(0xFFFF5C6C)),
             contentAlignment = Alignment.Center,
