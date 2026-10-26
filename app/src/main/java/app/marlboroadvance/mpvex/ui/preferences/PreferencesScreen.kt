@@ -14,12 +14,10 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.automirrored.outlined.ViewQuilt
 import androidx.compose.material.icons.outlined.Audiotrack
-import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Gesture
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.Info
 import app.marlboroadvance.mpvex.ui.browser.recentlyplayed.RecentlyPlayedScreen
 import app.marlboroadvance.mpvex.ui.browser.playlist.PlaylistScreen
 import app.marlboroadvance.mpvex.ui.browser.networkstreaming.NetworkStreamingScreen
@@ -421,52 +419,14 @@ object PreferencesScreen : Screen {
             }
           }
           
-          // Advanced & About Section
+          // Backup & Restore Section
           item {
-            PreferenceSectionHeader(title = "Advanced & About")
+            PreferenceSectionHeader(title = "Backup & Restore")
           }
-          
+
           item {
             PreferenceCard {
-              Preference(
-
-                title = { Text(text = stringResource(R.string.pref_advanced)) },
-                summary = { 
-                  Text(
-                    text = stringResource(id = R.string.pref_advanced_summary),
-                    color = MaterialTheme.colorScheme.outline
-                  ) 
-                },
-                icon = { 
-                  Icon(
-                    Icons.Outlined.Code, 
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                  ) 
-                },
-                onClick = { backstack.add(AdvancedPreferencesScreen) },
-              )
-              
-              PreferenceDivider()
-              
-              Preference(
-
-                title = { Text(text = stringResource(id = R.string.pref_about_title)) },
-                summary = { 
-                  Text(
-                    text = stringResource(id = R.string.pref_about_summary),
-                    color = MaterialTheme.colorScheme.outline
-                  ) 
-                },
-                icon = { 
-                  Icon(
-                    Icons.Outlined.Info, 
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                  ) 
-                },
-                onClick = { backstack.add(AboutScreen) },
-              )
+              BackupRestoreRows()
             }
           }
         }
