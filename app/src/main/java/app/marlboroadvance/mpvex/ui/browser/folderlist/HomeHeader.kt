@@ -6,8 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
@@ -42,7 +42,7 @@ fun HomeHeader(
 ) {
   var menuOpen by remember { mutableStateOf(false) }
   Row(
-    modifier = modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 8.dp),
+    modifier = modifier.fillMaxWidth().statusBarsPadding().padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 8.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Icon(
@@ -63,10 +63,11 @@ fun HomeHeader(
       IconButton(onClick = onSearchClick) {
         Icon(Icons.Filled.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onSurfaceVariant)
       }
-      IconButton(onClick = onToggleLayout) {
+      // The box icon opens Sort & view options
+      IconButton(onClick = onSortClick) {
         Icon(
-          imageVector = if (isGrid) Icons.Filled.GridView else Icons.AutoMirrored.Filled.ViewList,
-          contentDescription = if (isGrid) "Switch to list" else "Switch to grid",
+          imageVector = Icons.Filled.GridView,
+          contentDescription = "Sort & view options",
           tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
       }
@@ -76,10 +77,10 @@ fun HomeHeader(
         }
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
           DropdownMenuItem(
-            text = { Text("Sort & view options") },
+            text = { Text(if (isGrid) "List view" else "Grid view") },
             onClick = {
               menuOpen = false
-              onSortClick()
+              onToggleLayout()
             },
           )
           DropdownMenuItem(
