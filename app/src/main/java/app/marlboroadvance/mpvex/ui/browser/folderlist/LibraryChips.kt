@@ -34,10 +34,10 @@ fun LibraryChips(
       modifier
         .fillMaxWidth()
         .horizontalScroll(rememberScrollState())
-        .padding(horizontal = 12.dp, vertical = 4.dp),
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
+        .padding(horizontal = 16.dp, vertical = 8.dp),
+    horizontalArrangement = Arrangement.spacedBy(12.dp),
   ) {
-    LibraryChip(icon = Icons.Filled.MusicNote, label = "Music", onClick = onMusicClick)
+    LibraryChip(icon = Icons.Filled.MusicNote, label = "Music", highlighted = true, onClick = onMusicClick)
     LibraryChip(icon = Icons.Filled.Lock, label = "Privacy", onClick = onPrivacyClick)
   }
 }
@@ -47,28 +47,31 @@ private fun LibraryChip(
   icon: ImageVector,
   label: String,
   onClick: () -> Unit,
+  highlighted: Boolean = false,
 ) {
+  val container = if (highlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh
+  val content = if (highlighted) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
   Surface(
     onClick = onClick,
-    shape = RoundedCornerShape(22.dp),
-    color = MaterialTheme.colorScheme.secondaryContainer,
+    shape = RoundedCornerShape(50),
+    color = container,
   ) {
     Row(
-      modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
+      modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
       Icon(
         imageVector = icon,
         contentDescription = null,
-        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+        tint = content,
         modifier = Modifier.size(20.dp),
       )
       Text(
         text = label,
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Medium,
-        color = MaterialTheme.colorScheme.onSecondaryContainer,
+        color = content,
       )
     }
   }
