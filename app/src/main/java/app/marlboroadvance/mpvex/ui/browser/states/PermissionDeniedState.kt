@@ -156,12 +156,12 @@ fun PermissionDeniedState(
             Text(
               text = if (isPlayStoreBuild) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                  "One Player requires \"Photos and videos\" permission to access and play your video files stored on your device."
+                  "OnlyPlay requires \"Photos and videos\" permission to access and play your video files stored on your device."
                 } else {
-                  "One Player requires \"Storage\" permission to access and play your media files stored on your device."
+                  "OnlyPlay requires \"Storage\" permission to access and play your media files stored on your device."
                 }
               } else {
-                "One Player requires \"All file access\" permission to discover media and subtitles on your device due to a change in security policy in Android 11 and later versions."
+                "OnlyPlay requires \"All file access\" permission to discover media and subtitles on your device due to a change in security policy in Android 11 and later versions."
               },
               style = MaterialTheme.typography.bodyLarge,
               color = MaterialTheme.colorScheme.onSurface,
@@ -236,7 +236,7 @@ fun PermissionDeniedState(
   // Explanation Dialog
   if (showExplanationDialog) {
     val uriHandler = LocalUriHandler.current
-    val githubUrl = "https://github.com/marlboro-advance/mpvex"
+    val githubUrl = "https://github.com/darkdesign69/OnePlayer"
 
     AlertDialog(
       onDismissRequest = { showExplanationDialog = false },
@@ -265,7 +265,7 @@ fun PermissionDeniedState(
           if (isPlayStoreBuild) {
             // Play Store build explanation
             Text(
-              text = "One Player needs access to your video files to provide its core functionality as a media player.",
+              text = "OnlyPlay needs access to your video files to provide its core functionality as a media player.",
               style = MaterialTheme.typography.bodyMedium,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -295,7 +295,7 @@ fun PermissionDeniedState(
           } else {
             // Standard build explanation
             Text(
-              text = "One Player has always required storage access permission as it's essential for the app to find all media and subtitle files on your device, including the ones that are not supported by the system.",
+              text = "OnlyPlay has always required storage access permission as it's essential for the app to find all media and subtitle files on your device, including the ones that are not supported by the system.",
               style = MaterialTheme.typography.bodyMedium,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -314,7 +314,7 @@ fun PermissionDeniedState(
           }
 
           Text(
-            text = "One Player is based on the open source project mpvEx. You can review the source code and verify how permissions are used by visiting our GitHub repository at:",
+            text = "OnlyPlay is open source. You can review the source code and verify how permissions are used by visiting our GitHub repository at:",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )

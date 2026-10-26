@@ -429,6 +429,15 @@ object PreferencesScreen : Screen {
               BackupRestoreRows()
             }
           }
+
+          item {
+            Text(
+              text = "OnlyPlay  •  Created by darkdesign69",
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.outline,
+              modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
+            )
+          }
         }
       }
     }

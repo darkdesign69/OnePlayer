@@ -25,7 +25,7 @@
           android:gravity="center"
           android:includeFontPadding="false"
           android:maxLines="2"
-          android:text="One Player"
+          android:text="OnlyPlay"
           android:textSize="20sp"
           android:textStyle="bold"
           android:shadowColor="#99000000"

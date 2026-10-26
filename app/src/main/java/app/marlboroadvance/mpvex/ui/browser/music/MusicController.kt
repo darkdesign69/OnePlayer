@@ -401,7 +401,7 @@ object MusicController {
     loadPrefs()
     registerDeviceCallback()
     session =
-      MediaSessionCompat(app, "OnePlayerMusic").apply {
+      MediaSessionCompat(app, "OnlyPlayMusic").apply {
         setCallback(
           object : MediaSessionCompat.Callback() {
             override fun onPlay() = resume()

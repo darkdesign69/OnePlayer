@@ -50,7 +50,7 @@
           android:includeFontPadding="false"
           android:maxLines="1"
           android:singleLine="true"
-          android:text="One Player"
+          android:text="OnlyPlay"
           android:textColor="#FFFFFFFF"
           android:textSize="18sp"
           android:textStyle="bold" />
