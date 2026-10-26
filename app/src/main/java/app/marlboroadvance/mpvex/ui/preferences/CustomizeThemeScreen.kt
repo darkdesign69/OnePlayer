@@ -181,7 +181,7 @@ object CustomizeThemeScreen : Screen {
               verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
               Text(
-                text = "One Player",
+                text = "OnlyPlay",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,

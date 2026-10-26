@@ -1,5 +1,5 @@
 <resources>
-  <string name="app_name" translatable="false">One Player - Video Player</string>
+  <string name="app_name" translatable="false">OnlyPlay</string>
   <string name="generic_reset">Reset</string>
   <string name="generic_share">Share</string>
   <string name="generic_confirm">Confirm</string>
@@ -250,7 +250,7 @@
   <string name="pref_about_oss_libraries">Libraries</string>
   <string name="pref_about_donate_title">Donate</string>
   <string name="pref_about_donate_kofi">Ko-fi</string>
-  <string name="pref_about_donate_kofi_summary">Support the developer on Ko-fi</string>
+  <string name="pref_about_donate_kofi_summary">Support the developer</string>
   <string name="pref_about_donate_kofi_url" translatable="false">https://ko-fi.com/adityanarvekar</string>
   <string name="pref_about_donate_paypal">PayPal</string>
   <string name="pref_about_donate_paypal_summary">Support the developer on PayPal</string>
@@ -350,7 +350,7 @@
   <string name="toast_sleep_timer_ended">Sleep timer ended</string>
   <string name="toast_file_no_longer_exists">File no longer exists</string>
   <string name="volume_slider_absolute_value" translatable="false">%d</string>
-  <string name="github_repo_url" translatable="false">https://github.com/marlboro-advance/mpvex</string>
+  <string name="github_repo_url" translatable="false">https://github.com/darkdesign69/OnePlayer</string>
   <string name="swap_the_volume_and_brightness_slider">Swap volume and brightness slider</string>
   <string name="pref_player_display_reduce_player_animation">Reduce player animation</string>
   <string name="pref_player_display_hide_player_control_time">Hide player control time</string>

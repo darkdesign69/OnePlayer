@@ -146,7 +146,7 @@ internal suspend fun fetchLyricsOnline(t: MusicTrack): String? =
       return try {
         c.connectTimeout = 8000
         c.readTimeout = 8000
-        c.setRequestProperty("User-Agent", "OnePlayer Music")
+        c.setRequestProperty("User-Agent", "OnlyPlay Music")
         if (c.responseCode == 200) c.inputStream.bufferedReader().readText() else null
       } catch (_: Exception) {
         null
